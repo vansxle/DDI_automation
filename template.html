@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+/* ============================================================
+   WISDOM GROUP HOLDINGS — CONSOLIDATED STATEMENT TEMPLATE
+   Single <style> block, no external frameworks or JS.
+   All financial figures are {{token}} placeholders filled
+   by engine.py before PDF conversion.
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 9.5pt;
+  color: #222;
+  background: white;
+}
+
+/* === PAGE BREAKS ===================================== */
+@page {
+  size: A4;
+  margin: 14mm 15mm 16mm 15mm;
+}
+@page :first {
+  margin: 0;
+  @bottom-right { content: ""; }
+}
+.page-break { break-before: page; page-break-before: always; }
+
+/* === COVER PAGE ====================================== */
+.cover-page {
+  width: 210mm;
+  min-height: 297mm;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: white;
+}
+.cover-top-bar {
+  height: 6px;
+  background: linear-gradient(90deg, #2a6b7c 0%, #4bacc6 100%);
+  width: 100%;
+}
+.cover-body {
+  flex: 1;
+  padding: 20mm 20mm 10mm 20mm;
+}
+.cover-logo-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12mm;
+}
+.cover-logo-box {
+  width: 55px;
+  height: 55px;
+  background: #2a6b7c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 14px;
+  font-size: 18pt;
+  color: white;
+  font-weight: bold;
+  letter-spacing: -1px;
+  border-radius: 3px;
+}
+.cover-logo-text { display: flex; flex-direction: column; }
+.cover-logo-name {
+  font-size: 18pt;
+  font-weight: 700;
+  color: #2a6b7c;
+  letter-spacing: 2px;
+  line-height: 1.1;
+}
+.cover-logo-sub {
+  font-size: 8pt;
+  color: #4bacc6;
+  letter-spacing: 3px;
+  font-weight: 500;
+  margin-top: 2px;
+}
+.cover-logo-cn {
+  font-size: 8pt;
+  color: #666;
+  margin-top: 1px;
+}
+.cover-hr {
+  border: none;
+  border-top: 2px solid #2a6b7c;
+  margin: 0 0 12mm 0;
+}
+.cover-title {
+  font-size: 18pt;
+  font-weight: 400;
+  color: #222;
+  margin-bottom: 8mm;
+}
+.cover-client-table {
+  border-collapse: collapse;
+  margin-bottom: 8mm;
+  width: 280px;
+}
+.cover-client-table td {
+  padding: 3px 12px 3px 0;
+  font-size: 10pt;
+  vertical-align: top;
+}
+.cover-client-table .lbl { color: #888; font-style: italic; }
+.cover-client-table .val { font-weight: 700; font-size: 11pt; }
+.cover-custodian-table {
+  border-collapse: collapse;
+  width: 380px;
+  margin-bottom: 14mm;
+}
+.cover-custodian-table thead td {
+  font-style: italic;
+  color: #888;
+  font-size: 9pt;
+  padding: 4px 16px 4px 0;
+  border-bottom: 1px solid #ccc;
+}
+.cover-custodian-table tbody td {
+  padding: 5px 16px 5px 0;
+  font-size: 10pt;
+  border-bottom: 1px solid #eee;
+}
+.cover-disclaimer {
+  font-size: 9pt;
+  color: #333;
+  line-height: 1.55;
+  max-width: 160mm;
+}
+.cover-disclaimer strong { font-weight: 700; }
+.cover-bottom-bar {
+  height: 6px;
+  background: linear-gradient(90deg, #2a6b7c 0%, #4bacc6 100%);
+}
+.cover-footer {
+  background: #2a6b7c;
+  color: white;
+  padding: 8mm 20mm;
+  display: flex;
+  gap: 40mm;
+}
+.cover-footer-col { flex: 1; }
+.cover-footer-company { font-size: 10pt; font-weight: 700; margin-bottom: 4mm; }
+.cover-footer-line { font-size: 8pt; line-height: 1.7; opacity: 0.9; }
+
+/* === INTERIOR PAGE HEADER ============================ */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 5px;
+  margin-bottom: 0;
+}
+.hdr-company {
+  font-weight: 700;
+  font-size: 10pt;
+  color: #222;
+}
+.hdr-meta {
+  display: flex;
+  gap: 24px;
+}
+.hdr-meta-item { text-align: left; }
+.hdr-meta-label {
+  display: block;
+  font-size: 7.5pt;
+  color: #888;
+  line-height: 1.2;
+}
+.hdr-meta-value {
+  display: block;
+  font-size: 9pt;
+  color: #222;
+  line-height: 1.2;
+}
+.hdr-bar {
+  height: 5px;
+  background: linear-gradient(90deg, #2a6b7c 0%, #4bacc6 100%);
+  margin-bottom: 14px;
+}
+
+/* === SECTION HEADINGS ================================ */
+h2 {
+  font-size: 14pt;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+h3 {
+  font-size: 11pt;
+  font-weight: 700;
+  color: #2a6b7c;
+  margin: 16px 0 6px 0;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+/* === ALLOCATION LAYOUT (two-column) ================== */
+.alloc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-top: 4px;
+}
+.alloc-table-wrap { flex: 0 0 auto; min-width: 280px; }
+.alloc-chart-wrap { flex: 1; display: flex; justify-content: center; }
+
+/* === DATA TABLES ===================================== */
+table.data-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+table.data-table thead td, table.data-table thead th {
+  font-style: italic;
+  font-weight: normal;
+  color: #888;
+  font-size: 8.5pt;
+  padding: 4px 8px 4px 4px;
+  border-bottom: 1px solid #bbb;
+}
+table.data-table tbody tr td {
+  padding: 5px 8px 5px 4px;
+  font-size: 9.5pt;
+  border-bottom: 1px solid #eeeeee;
+}
+table.data-table tbody tr.total-row td {
+  font-weight: 700;
+  border-top: 1.5px solid #aaa;
+  border-bottom: none;
+  padding-top: 6px;
+}
+.num { text-align: right; }
+.na-row td { color: #aaa; font-style: italic; }
+
+/* === SMALL ALLOCATION TABLE ========================== */
+table.alloc-tbl {
+  border-collapse: collapse;
+  width: 280px;
+}
+table.alloc-tbl thead td {
+  font-style: italic;
+  color: #888;
+  font-size: 8.5pt;
+  padding: 4px 8px 4px 4px;
+  border-bottom: 1px solid #bbb;
+}
+table.alloc-tbl tbody td {
+  padding: 5px 8px 5px 4px;
+  font-size: 9.5pt;
+  border-bottom: 1px solid #eee;
+}
+table.alloc-tbl tbody tr.total-row td {
+  font-weight: 700;
+  border-top: 1.5px solid #aaa;
+  border-bottom: none;
+}
+
+/* === CROSS-TAB TABLE ================================= */
+table.xtab {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 8.5pt;
+  margin-top: 16px;
+}
+table.xtab thead td {
+  font-style: italic;
+  color: #888;
+  padding: 4px 6px;
+  border-bottom: 1px solid #bbb;
+  text-align: right;
+}
+table.xtab thead td:first-child { text-align: left; }
+table.xtab tbody td {
+  padding: 5px 6px;
+  border-bottom: 1px solid #eee;
+  text-align: right;
+}
+table.xtab tbody td:first-child { text-align: left; font-weight: 500; }
+table.xtab tbody td.total { font-weight: 700; }
+
+/* === POSITION DETAIL TABLE =========================== */
+table.pos-tbl {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 8.5pt;
+}
+table.pos-tbl thead td {
+  font-style: italic;
+  color: #888;
+  padding: 3px 6px;
+  border-bottom: 1px solid #bbb;
+}
+table.pos-tbl thead td.r { text-align: right; }
+table.pos-tbl tbody td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: top;
+}
+table.pos-tbl tbody td.r { text-align: right; }
+table.pos-tbl .desc { word-break: break-word; max-width: 260px; }
+.pos-section { margin-bottom: 18px; }
+.pos-section h3 { break-after: avoid; page-break-after: avoid; }
+
+/* === DISCLAIMER ===================================== */
+.disclaimer-body {
+  font-size: 9.5pt;
+  line-height: 1.65;
+  color: #333;
+  max-width: 175mm;
+  margin-top: 8px;
+}
+.disclaimer-cn {
+  font-size: 9pt;
+  line-height: 1.7;
+  color: #333;
+  max-width: 175mm;
+  margin-top: 14px;
+}
+.end-statement {
+  text-align: center;
+  font-size: 10pt;
+  margin-top: 30px;
+  color: #555;
+}
+</style>
+</head>
+<body>
+
+<!-- ====================================================
+     COVER PAGE
+     ==================================================== -->
+<div class="cover-page">
+  <div class="cover-top-bar"></div>
+  <div class="cover-body">
+
+    <div class="cover-logo-row">
+      <div class="cover-logo-box">W</div>
+      <div class="cover-logo-text">
+        <span class="cover-logo-name">WISDOM</span>
+        <span class="cover-logo-sub">GROUP HOLDINGS LIMITED</span>
+        <span class="cover-logo-cn">滙智控股集團有限公司</span>
+      </div>
+    </div>
+
+    <hr class="cover-hr">
+
+    <div class="cover-title">Statement of assets as of {{statement_date_display}}</div>
+
+    <table class="cover-client-table">
+      <tr>
+        <td class="lbl">Client</td>
+        <td class="val">{{client_name}}</td>
+      </tr>
+      <tr>
+        <td class="lbl">RM</td>
+        <td class="val">{{rm_name}}</td>
+      </tr>
+    </table>
+
+    <table class="cover-custodian-table">
+      <thead>
+        <tr>
+          <td>Custodian bank</td>
+          <td>Consolidated accounts</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{custodian_accounts_rows}}
+      </tbody>
+    </table>
+
+    <div class="cover-disclaimer">
+      This report represents the market value of your portfolios as on
+      <strong>{{statement_date_display}}</strong> for <strong>{{total_value_usd}}</strong>.
+      The prices mentioned in the present document are provided only as an indication of the
+      portfolio value and the WAM takes no responsibility therefor.
+    </div>
+
+  </div>
+  <div class="cover-bottom-bar"></div>
+  <div class="cover-footer">
+    <div class="cover-footer-col">
+      <div class="cover-footer-company">Wisdom Group Holdings Limited</div>
+      <div class="cover-footer-line">
+        Hong Kong<br>
+        TEL - (852)3643 0877 &nbsp;|&nbsp; FAX - (852)3468 2585<br>
+        general@wisdom-financial.com<br>
+        16/F, China Minmetals Tower, 79 Chatham Road South,<br>
+        Tsim Sha Tsui, Kowloon
+      </div>
+    </div>
+    <div class="cover-footer-col">
+      <div class="cover-footer-company">&nbsp;</div>
+      <div class="cover-footer-line">
+        Singapore<br>
+        TEL - (65)8651 5302<br>
+        &nbsp;<br>
+        1 Marina Boulevard, Level 20,<br>
+        Singapore 018989
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ====================================================
+     TABLE OF CONTENTS (Page 1)
+     ==================================================== -->
+<div class="page-break">
+  <div class="page-header">
+    <div class="hdr-company">Wisdom Group Holdings Limited</div>
+    <div class="hdr-meta">
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Statement Date</span>
+        <span class="hdr-meta-value">{{statement_date_display}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Relationship Manager</span>
+        <span class="hdr-meta-value">{{rm_name}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Client</span>
+        <span class="hdr-meta-value">{{client_name}}</span>
+      </div>
+    </div>
+  </div>
+  <div class="hdr-bar"></div>
+
+  <h2>Table of Contents</h2>
+
+  <table style="width:100%; border-collapse:collapse; margin-top:20px;">
+    <tbody>
+      <tr style="border-bottom:1px dotted #ccc;">
+        <td style="font-style:italic; font-size:10pt; padding:10px 0;">Asset Type Allocation</td>
+        <td style="text-align:right; font-size:10pt; padding:10px 0; width:40px;">2</td>
+      </tr>
+      <tr style="border-bottom:1px dotted #ccc;">
+        <td style="font-style:italic; font-size:10pt; padding:10px 0;">Custodian Allocation</td>
+        <td style="text-align:right; font-size:10pt; padding:10px 0;">3</td>
+      </tr>
+      <tr style="border-bottom:1px dotted #ccc;">
+        <td style="font-style:italic; font-size:10pt; padding:10px 0;">Custodian/Asset Type Distribution</td>
+        <td style="text-align:right; font-size:10pt; padding:10px 0;">4</td>
+      </tr>
+      <tr style="border-bottom:1px dotted #ccc;">
+        <td style="font-style:italic; font-size:10pt; padding:10px 0;">Currency Distribution</td>
+        <td style="text-align:right; font-size:10pt; padding:10px 0;">5</td>
+      </tr>
+      <tr style="border-bottom:1px dotted #ccc;">
+        <td style="font-style:italic; font-size:10pt; padding:10px 0;">Position Detail</td>
+        <td style="text-align:right; font-size:10pt; padding:10px 0;">6</td>
+      </tr>
+      <tr style="border-bottom:1px dotted #ccc;">
+        <td style="font-style:italic; font-size:10pt; padding:10px 0;">Disclaimer</td>
+        <td style="text-align:right; font-size:10pt; padding:10px 0;">—</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================
+     ASSET TYPE ALLOCATION (Page 2)
+     ==================================================== -->
+<div class="page-break">
+  <div class="page-header">
+    <div class="hdr-company">Wisdom Group Holdings Limited</div>
+    <div class="hdr-meta">
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Statement Date</span>
+        <span class="hdr-meta-value">{{statement_date_display}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Relationship Manager</span>
+        <span class="hdr-meta-value">{{rm_name}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Client</span>
+        <span class="hdr-meta-value">{{client_name}}</span>
+      </div>
+    </div>
+  </div>
+  <div class="hdr-bar"></div>
+
+  <h2>Asset Type Allocation</h2>
+
+  <div class="alloc-row">
+    <div class="alloc-table-wrap">
+      <table class="alloc-tbl">
+        <thead>
+          <tr>
+            <td>Asset type</td>
+            <td class="num">Amount in USD</td>
+          </tr>
+        </thead>
+        <tbody>
+          {{asset_alloc_rows}}
+          <tr class="total-row">
+            <td>Total</td>
+            <td class="num">{{asset_grand_total}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="alloc-chart-wrap">
+      {{asset_pie_svg}}
+    </div>
+  </div>
+</div>
+
+
+<!-- ====================================================
+     CUSTODIAN ALLOCATION (Page 3)
+     ==================================================== -->
+<div class="page-break">
+  <div class="page-header">
+    <div class="hdr-company">Wisdom Group Holdings Limited</div>
+    <div class="hdr-meta">
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Statement Date</span>
+        <span class="hdr-meta-value">{{statement_date_display}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Relationship Manager</span>
+        <span class="hdr-meta-value">{{rm_name}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Client</span>
+        <span class="hdr-meta-value">{{client_name}}</span>
+      </div>
+    </div>
+  </div>
+  <div class="hdr-bar"></div>
+
+  <h2>Custodian Allocation</h2>
+
+  <div class="alloc-row">
+    <div class="alloc-table-wrap">
+      <table class="alloc-tbl">
+        <thead>
+          <tr>
+            <td>Custodian</td>
+            <td class="num">Amount in USD</td>
+          </tr>
+        </thead>
+        <tbody>
+          {{custodian_alloc_rows}}
+          <tr class="total-row">
+            <td>Total</td>
+            <td class="num">{{custodian_grand_total}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="alloc-chart-wrap">
+      {{custodian_pie_svg}}
+    </div>
+  </div>
+</div>
+
+
+<!-- ====================================================
+     CUSTODIAN / ASSET TYPE DISTRIBUTION (Page 4)
+     ==================================================== -->
+<div class="page-break">
+  <div class="page-header">
+    <div class="hdr-company">Wisdom Group Holdings Limited</div>
+    <div class="hdr-meta">
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Statement Date</span>
+        <span class="hdr-meta-value">{{statement_date_display}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Relationship Manager</span>
+        <span class="hdr-meta-value">{{rm_name}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Client</span>
+        <span class="hdr-meta-value">{{client_name}}</span>
+      </div>
+    </div>
+  </div>
+  <div class="hdr-bar"></div>
+
+  <h2>Custodian/Asset Type Distribution</h2>
+
+  <div style="margin-bottom:16px;">
+    {{custodian_asset_bar_svg}}
+  </div>
+
+  <table class="xtab">
+    <thead>
+      <tr>
+        <td>Custodian</td>
+        <td><em>Liquidity</em></td>
+        <td>Bond</td>
+        <td>Equity</td>
+        <td>Fund</td>
+        <td>STP</td>
+        <td>Loan</td>
+        <td>Ins.</td>
+        <td>Total</td>
+      </tr>
+    </thead>
+    <tbody>
+      {{custodian_asset_crosstab_rows}}
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================
+     CURRENCY DISTRIBUTION (Page 5)
+     ==================================================== -->
+<div class="page-break">
+  <div class="page-header">
+    <div class="hdr-company">Wisdom Group Holdings Limited</div>
+    <div class="hdr-meta">
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Statement Date</span>
+        <span class="hdr-meta-value">{{statement_date_display}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Relationship Manager</span>
+        <span class="hdr-meta-value">{{rm_name}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Client</span>
+        <span class="hdr-meta-value">{{client_name}}</span>
+      </div>
+    </div>
+  </div>
+  <div class="hdr-bar"></div>
+
+  <h2>Currency Distribution</h2>
+
+  <div class="alloc-row">
+    <div class="alloc-table-wrap">
+      <table class="alloc-tbl">
+        <thead>
+          <tr>
+            <td>Currency</td>
+            <td class="num">Amount in USD</td>
+          </tr>
+        </thead>
+        <tbody>
+          {{currency_summary_rows}}
+        </tbody>
+      </table>
+    </div>
+    <div class="alloc-chart-wrap">
+      {{currency_bar_svg}}
+    </div>
+  </div>
+
+  <table class="xtab">
+    <thead>
+      <tr>
+        <td>Currency</td>
+        <td><em>Liquidity</em></td>
+        <td>Bond</td>
+        <td>Equity</td>
+        <td>Fund</td>
+        <td>STP</td>
+        <td>Loan</td>
+        <td>Ins.</td>
+        <td>Total</td>
+      </tr>
+    </thead>
+    <tbody>
+      {{currency_crosstab_rows}}
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ====================================================
+     POSITION DETAIL (Page 6+)
+     ==================================================== -->
+<div class="page-break">
+  <div class="page-header">
+    <div class="hdr-company">Wisdom Group Holdings Limited</div>
+    <div class="hdr-meta">
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Statement Date</span>
+        <span class="hdr-meta-value">{{statement_date_display}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Relationship Manager</span>
+        <span class="hdr-meta-value">{{rm_name}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Client</span>
+        <span class="hdr-meta-value">{{client_name}}</span>
+      </div>
+    </div>
+  </div>
+  <div class="hdr-bar"></div>
+
+  <h2>Position Detail</h2>
+
+  <!-- LIQUIDITY -->
+  <div class="pos-section">
+    <h3>Liquidity</h3>
+    <table class="pos-tbl">
+      <thead>
+        <tr>
+          <td>Product Type</td>
+          <td class="r"># Holdings</td>
+          <td class="r">Value in USD</td>
+          <td class="r">%</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{pos_liquidity_rows}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- BOND -->
+  <div class="pos-section">
+    <h3>Bond</h3>
+    <table class="pos-tbl">
+      <thead>
+        <tr>
+          <td>Product Type</td>
+          <td class="r"># Holdings</td>
+          <td class="r">Value in USD</td>
+          <td class="r">%</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{pos_bond_rows}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- EQUITY -->
+  <div class="pos-section">
+    <h3>Equity</h3>
+    <table class="pos-tbl">
+      <thead>
+        <tr>
+          <td>Product Type</td>
+          <td class="r"># Holdings</td>
+          <td class="r">Value in USD</td>
+          <td class="r">%</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{pos_equity_rows}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- FUND -->
+  <div class="pos-section">
+    <h3>Fund</h3>
+    <table class="pos-tbl">
+      <thead>
+        <tr>
+          <td>Product Type</td>
+          <td class="r"># Holdings</td>
+          <td class="r">Value in USD</td>
+          <td class="r">%</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{pos_fund_rows}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- STRUCTURED PRODUCT -->
+  <div class="pos-section">
+    <h3>Structured Product</h3>
+    <table class="pos-tbl">
+      <thead>
+        <tr>
+          <td>Product Type</td>
+          <td class="r"># Holdings</td>
+          <td class="r">Value in USD</td>
+          <td class="r">%</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{pos_stp_rows}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- LOAN -->
+  <div class="pos-section">
+    <h3>Loan</h3>
+    <table class="pos-tbl">
+      <thead>
+        <tr>
+          <td>Product Type</td>
+          <td class="r"># Holdings</td>
+          <td class="r">Value in USD</td>
+          <td class="r">%</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{pos_loan_rows}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- INSURANCE -->
+  <div class="pos-section">
+    <h3>Insurance</h3>
+    <table class="pos-tbl">
+      <thead>
+        <tr>
+          <td>Product Type</td>
+          <td class="r"># Holdings</td>
+          <td class="r">Value in USD</td>
+          <td class="r">%</td>
+        </tr>
+      </thead>
+      <tbody>
+        {{pos_insurance_rows}}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+
+<!-- ====================================================
+     DISCLAIMER
+     ==================================================== -->
+<div class="page-break">
+  <div class="page-header">
+    <div class="hdr-company">Wisdom Group Holdings Limited</div>
+    <div class="hdr-meta">
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Statement Date</span>
+        <span class="hdr-meta-value">{{statement_date_display}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Relationship Manager</span>
+        <span class="hdr-meta-value">{{rm_name}}</span>
+      </div>
+      <div class="hdr-meta-item">
+        <span class="hdr-meta-label">Client</span>
+        <span class="hdr-meta-value">{{client_name}}</span>
+      </div>
+    </div>
+  </div>
+  <div class="hdr-bar"></div>
+
+  <h2>Disclaimer</h2>
+
+  <div class="disclaimer-body">
+    The statement of assets may deviate from previous versions due to retroactive bookings,
+    historical market prices and general product investment data changes. You should check this
+    statement carefully. If you do not notify us of any discrepancies, omissions, or incorrect
+    entries in your portfolio within 90 days of the production date of this statement, the
+    contents of this statement will be deemed to be accepted by you as complete and accurate.
+    We are not liable for any inaccuracies in this statement due to technical or administrative
+    error or otherwise and we reserve the right to correct any such inaccuracies. In order for
+    us to better serve you, please notify your Client Advisor if you have changed your mailing
+    address or other contact information.
+  </div>
+
+  <div class="disclaimer-cn">
+    資產報表可能因追溯記帳、歷史市價及一般產品投資資料改變而與過往的版本出現差異。您應仔細查閱本報表。如果您於本報表編製日期起計
+    90日內並無通知我們有關您的投資組合內的任何差異、遺漏或不正確項目，則本報表的內容將被視為已獲您接受為完整及準確。我們不會就因技術或行政出錯或其他原因令本報表資料不準確承擔任何責任，而我們有權修正任何有關不準確之處。此中文譯本之帳戶報表並非正式版本，乃基於您的要求及便利性而提供。帳戶報表應以英文版為標準版本，任何有關爭議將以英文版本為優先參考。如需索取英文版本的帳戶報表，請與客戶顧問聯絡。為讓我們為您提供更佳服務，如您已更改郵寄地址或其他聯絡資料，請通知您的客戶顧問。
+  </div>
+
+  <div class="end-statement">&lt; End of Statement &gt;</div>
+</div>
+
+</body>
+</html>
