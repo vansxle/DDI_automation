@@ -135,10 +135,22 @@ positions, a single `<tr class="na-row">` with "na" in every cell is emitted
 | `{{pos_loan_rows}}` | Loan |
 | `{{pos_insurance_rows}}` | Insurance (Ins.) |
 
-Position rows are sorted by absolute USD value descending. Each row contains:
+Position rows are **truly granular** — one row per individual holding (not a
+per-product-type summary), mirroring the legacy Wisdom statement. Rows are
+sorted by absolute USD value descending. Each row contains:
 `Custodian | Account | Description | Ccy | Value in USD | %`
 
-where `%` is the position's share of its own category total (by absolute value).
+where `%` is the position's share of its own category gross total (by absolute
+value).
+
+**Row-cap behaviour (`MAX_POS_ROWS`, default 18):** to keep long sections
+(e.g. 199 options) from overflowing the PDF, each section renders at most
+`MAX_POS_ROWS` individual holdings (the largest by absolute value). The
+remainder is collapsed into a single aggregated **`Other holdings (N positions)`**
+row whose value is the signed sum of the hidden positions. A closing
+**`Subtotal — <Category>`** row always shows the section's signed total at 100%.
+To show more or fewer individual rows, change the `MAX_POS_ROWS` constant near
+the top of the Position Detail block in `engine.py`.
 
 ---
 
@@ -258,14 +270,101 @@ between the two files.
 
 ---
 
-## 9. Known Constraints
+## 9. Frontend Redesign — Changelog (v2)
+
+The `template.html` was modernised while keeping the **token contract in §4
+identical** (drop-in replacement; `engine.py` data interface unchanged except
+for the granular Position Detail rows described in §4.7).
+
+| Area | v1 | v2 |
+|---|---|---|
+| Running page header | Date label wrapped mid-word (`01-/Jun-2026`) on every page | Fixed via `@page { @top-center: element(...) }` running element — date renders on one line |
+| Page numbers | Missing on the disclaimer page | `@bottom-right` `Page X of Y` on every non-cover page |
+| Cover | Plain figure | Headline `TOTAL PORTFOLIO VALUE` card with brand-gradient |
+| Charts | Small, floating in dead space | Larger, framed in rounded cards; SVGs constrained with `max-width:100%` so frames never overflow the page margin |
+| Position Detail | Per-product-type summary | Truly granular per-holding rows with subtotals (see §4.7) |
+| Styling | Inline-ish | Centralised `:root` teal palette, zebra striping, tabular-nums |
+
+All figures are still 100% engine-driven `{{token}}` substitutions — no
+hardcoded financial values were introduced.
+
+---
+
+## 10. Known Constraints
 
 - **No external JavaScript or CSS frameworks** are used; the template is
   self-contained with one `<style>` block, ensuring compatibility with
   automated enterprise PDF renderers.
 - **Pie charts** only plot positive-valued segments; negative positions
   (loans, short options) appear in tables but not in the pie.
-- **Position Detail descriptions** are truncated to 90 characters to prevent
+- **Position Detail descriptions** are truncated to ~88 characters to prevent
   table overflow on narrow pages.
+- **Position Detail row cap**: sections show the top `MAX_POS_ROWS` (default 18)
+  holdings; smaller positions are aggregated into one `Other holdings` row.
+  This keeps page count bounded regardless of how many raw positions a feed
+  contains.
 - **WeasyPrint** requires `libpango` to be installed on the host OS. On macOS
   this is `brew install pango`; on Debian/Ubuntu it is `apt-get install libpango-1.0-0`.
+
+---
+
+## 11. Frontend Redesign — Changelog (v3)
+
+v3 builds on v2 with readable charts, the **real company logo**, and
+**period-over-period (PoP) comparison**. The token contract in §4 remains
+backward-compatible: every existing token is preserved and the engine still
+runs on a single CSV with no extra arguments.
+
+| Area | v2 | v3 |
+|---|---|---|
+| Brand logo | Recreated/styled wordmark | **Real logo** extracted from the legacy statement PDF, embedded as a base64 PNG data URI (`logo_datauri.txt`). Black extraction background made transparent so it sits cleanly on the white cover and in the running header. Never recreated. |
+| Allocation charts | Flat pie (positive segments only) | **Donut** with a side legend listing label / value / % per segment and a compact total (`_short_usd`) in the center hole. |
+| Currency chart | Vertical bar (USD bar dwarfed the rest) | **Horizontal bars** with signed value labels; negative currencies render in red left of the zero line, the long tail is grouped into `Other (N)`, and the dominant USD bar is capped so smaller bars stay readable. |
+| Custodian/Asset chart | Stacked bar, no labels | **Stacked bar** with per-stack value labels and a cleaner legend. |
+| Period-over-period | — | New **Section 05 "Portfolio Change"** (when a prior snapshot is supplied): Δ USD and Δ % per asset class and per custodian, color-coded (green gain / red loss), with a highlighted grand-total row and a `NEW` tag for custodians absent from the prior. A cover **delta badge** shows the total change (`▲ +1,389,801 (+1.1%)`). |
+| Conditional sections | All sections always rendered | When **no** prior is supplied, the Portfolio Change page is **omitted entirely** (no orphan em-dash table) and the remaining sections renumber automatically (Position Detail → 05, Disclaimer → 06). The TOC and section eyebrows are driven by `{{toc_change_row}}`, `{{sec_position_no}}`, `{{sec_disclaimer_no}}`, `{{toc_position_page}}`. |
+
+### 11.1 New CLI argument
+
+```bash
+# Standalone (backward-compatible — no Portfolio Change section):
+python3 engine.py mock_position_01062026.csv \
+    --client "Demo Client" --rm "Ethan Wang" --output out/
+
+# With period-over-period comparison vs a prior snapshot:
+python3 engine.py mock_position_16062026.csv \
+    --client "Demo Client" --rm "Ethan Wang" --output out/ \
+    --prior mock_position_01062026.csv
+```
+
+`--prior <csv>` is optional. When given, the engine loads the prior snapshot via
+the same `load_and_compute()` path and computes deltas; when omitted, all
+delta-bearing tokens collapse to em-dashes / empty and the change section is
+dropped.
+
+### 11.2 New / changed chart functions (`engine.py`)
+
+| Function | Purpose |
+|---|---|
+| `donut_svg(segments, width, height, center_title, center_value)` | Donut chart + side legend (replaces the old `pie_svg`). |
+| `hbar_svg(rows, width, height, max_rows)` | Signed horizontal bars with value labels + top-N grouping. |
+| `stacked_bar_svg(categories, custodians, data, ...)` | Stacked bar with value labels and legend. |
+| `_short_usd(n)` | Compact money formatting (e.g. `128.99M`, `1.30B`, `540K`) for the donut center. |
+| `_delta_pct(diff, prior)` | Δ % using `diff / abs(prior) * 100` so the sign follows the USD direction (correctly handles negative-prior lines such as Loan). |
+| `_delta_badge(cur, prior)` | Cover badge HTML + text. |
+| `_delta_cell(cur, prior)` | Two `<td>` cells (Δ USD, Δ %) for the change table. |
+| `_load_logo_data_uri(template_path)` | Reads `logo_datauri.txt` (next to the template or engine) for the embedded logo. |
+
+### 11.3 New tokens (added; none removed)
+
+`cover_delta_badge`, `portfolio_change_section`, `toc_change_row`,
+`sec_position_no`, `sec_disclaimer_no`, `toc_position_page`,
+`prior_statement_date`, `logo_data_uri`. The previous `asset_pie_svg`,
+`custodian_pie_svg`, and `currency_bar_svg` tokens are retained but now carry
+donut / horizontal-bar SVGs.
+
+### 11.4 Deployment note
+
+`logo_datauri.txt` **must be committed alongside `engine.py` and
+`template.html`** — the engine reads it at render time. Without it the logo
+tokens render empty.

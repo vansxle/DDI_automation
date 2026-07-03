@@ -95,276 +95,177 @@ def esc(s):
 # All return a self-contained <svg>…</svg> string.
 # ============================================================
 
-def _arc_path(cx, cy, r, start_angle, sweep):
-    """Return SVG arc path string for a pie slice (centre-to-edge fan)."""
-    end_angle = start_angle + sweep
-    large_arc = 1 if sweep > math.pi else 0
-    x1 = cx + r * math.cos(start_angle)
-    y1 = cy + r * math.sin(start_angle)
-    x2 = cx + r * math.cos(end_angle)
-    y2 = cy + r * math.sin(end_angle)
-    return (
-        f"M {cx:.2f} {cy:.2f} "
-        f"L {x1:.2f} {y1:.2f} "
-        f"A {r:.2f} {r:.2f} 0 {large_arc} 1 {x2:.2f} {y2:.2f} Z"
-    )
+def _arc(cx, cy, r, a0, a1):
+    x0, y0 = cx + r * math.cos(a0), cy + r * math.sin(a0)
+    x1, y1 = cx + r * math.cos(a1), cy + r * math.sin(a1)
+    large = 1 if (a1 - a0) > math.pi else 0
+    return x0, y0, x1, y1, large
 
 
-def pie_svg(segments, width=440, height=300):
-    """
-    segments : list of (label_str, value_float, pct_str)
-               Only segments with value > 0 are drawn.
-    Returns an inline SVG string with ample padding for labels.
-    """
-    # Pie sits in the centre with 90px padding on each side for labels
-    pad = 95
-    r   = (min(width, height) - 2 * pad) / 2
-    cx  = width / 2
-    cy  = height / 2
-    lbl_r  = r * 1.52   # label text anchor radius
-    line_r0 = r + 5     # leader line start (just outside slice)
-    line_r1 = r * 1.38  # leader line end
+def donut_svg(segments, width=470, height=300, center_title="", center_value=""):
+    """Donut chart with a clean side legend (label, value, %).
+    segments: list of (label, value, ...). Only value>0 drawn; % recomputed internally."""
+    pos = [(l, v) for l, v, *_ in segments if v > 0]
+    total = sum(v for _, v in pos) or 1.0
 
-    positive = [(lbl, v, pct) for lbl, v, pct in segments if v > 0]
-    total = sum(v for _, v, _ in positive)
+    R = 92        # outer radius
+    r_in = 56     # inner radius (donut hole)
+    cx, cy = 118, height / 2
 
-    out = [
-        f'<svg width="{width}" height="{height}" '
-        f'viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">'
-    ]
-    if total <= 0:
-        out.append(
-            f'<text x="{cx:.0f}" y="{cy:.0f}" text-anchor="middle" '
-            f'font-size="10" fill="#999">No data</text>'
-        )
-        out.append("</svg>")
+    out = [f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+           f'xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif">']
+
+    if total <= 0 or not pos:
+        out.append(f'<text x="{cx}" y="{cy}" text-anchor="middle" font-size="11" fill="#999">No data</text></svg>')
         return "".join(out)
 
-    cur = -math.pi / 2      # start from 12 o'clock
-    for i, (lbl, v, pct) in enumerate(positive):
+    a = -math.pi / 2
+    for i, (lbl, v) in enumerate(pos):
         sweep = 2 * math.pi * v / total
+        a1 = a + sweep
+        x0, y0, x1, y1, large = _arc(cx, cy, R, a, a1)
+        xi0, yi0, xi1, yi1, _ = _arc(cx, cy, r_in, a, a1)
         color = CHART_COLORS[i % len(CHART_COLORS)]
-
-        # Pie slice
         out.append(
-            f'<path d="{_arc_path(cx, cy, r, cur, sweep)}" '
-            f'fill="{color}" stroke="white" stroke-width="1.5"/>'
+            f'<path d="M {x0:.2f} {y0:.2f} A {R} {R} 0 {large} 1 {x1:.2f} {y1:.2f} '
+            f'L {xi1:.2f} {yi1:.2f} A {r_in} {r_in} 0 {large} 0 {xi0:.2f} {yi0:.2f} Z" '
+            f'fill="{color}" stroke="#fff" stroke-width="2"/>'
         )
+        a = a1
 
-        # Label + leader line at midpoint of arc
-        mid = cur + sweep / 2
-        lx  = cx + lbl_r  * math.cos(mid)
-        ly  = cy + lbl_r  * math.sin(mid)
-        lx0 = cx + line_r0 * math.cos(mid)
-        ly0 = cy + line_r0 * math.sin(mid)
-        lx1 = cx + line_r1 * math.cos(mid)
-        ly1 = cy + line_r1 * math.sin(mid)
+    if center_value:
+        out.append(f'<text x="{cx}" y="{cy-4}" text-anchor="middle" font-size="9" fill="#7b8a90" '
+                   f'letter-spacing="1">{esc(center_title)}</text>')
+        out.append(f'<text x="{cx}" y="{cy+13}" text-anchor="middle" font-size="13" font-weight="700" '
+                   f'fill="#143b46">{esc(center_value)}</text>')
 
-        # Use strict left/right anchoring so text grows away from the pie
-        if math.cos(mid) < -0.15:
-            anchor = "end"
-        elif math.cos(mid) > 0.15:
-            anchor = "start"
+    lx = 235
+    n = len(pos)
+    row_h = min(26, (height - 30) / max(n, 1))
+    ly = (height - n * row_h) / 2 + row_h / 2
+    for i, (lbl, v) in enumerate(pos):
+        color = CHART_COLORS[i % len(CHART_COLORS)]
+        yc = ly + i * row_h
+        pct = v / total * 100
+        out.append(f'<rect x="{lx}" y="{yc-6}" width="12" height="12" rx="2" fill="{color}"/>')
+        out.append(f'<text x="{lx+19}" y="{yc+3.5}" font-size="9.5" fill="#1c2529">{esc(lbl)}</text>')
+        out.append(f'<text x="{width-70}" y="{yc+3.5}" font-size="9.5" fill="#1c2529" '
+                   f'text-anchor="end" font-weight="600">{fmt(v)}</text>')
+        out.append(f'<text x="{width-2}" y="{yc+3.5}" font-size="9" fill="#7b8a90" '
+                   f'text-anchor="end">{pct:.1f}%</text>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def hbar_svg(rows, width=470, height=330, max_rows=12):
+    """Horizontal bar chart with value labels - readable even with one dominant value.
+    rows: list of (label, value). Negative values shown in red, label kept right of zero-line."""
+    rows = [(l, v) for l, v in rows if abs(v) > 0.01]
+    if len(rows) > max_rows:
+        head = rows[:max_rows - 1]
+        rest_val = sum(v for _, v in rows[max_rows - 1:])
+        rows = head + [(f"Other ({len(rows)-(max_rows-1)})", rest_val)]
+
+    out = [f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+           f'xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif">']
+    if not rows:
+        out.append(f'<text x="{width/2}" y="{height/2}" text-anchor="middle" font-size="11" fill="#999">No data</text></svg>')
+        return "".join(out)
+
+    pad_l, pad_r, pad_t, pad_b = 62, 92, 12, 12
+    plot_w = width - pad_l - pad_r
+    n = len(rows)
+    row_h = (height - pad_t - pad_b) / n
+    bar_h = min(15, row_h * 0.58)
+
+    vmax = max((v for _, v in rows), default=1.0)
+    vmin = min((v for _, v in rows), default=0.0)
+    span_pos = max(vmax, 0.0)
+    span_neg = max(-vmin, 0.0)
+    # Cap the negative gutter so a small negative never eats >18% of the plot.
+    neg_frac = 0.0 if span_pos <= 0 else min(0.18, span_neg / (span_pos + span_neg))
+    pos_w = plot_w * (1 - neg_frac)
+    neg_w = plot_w * neg_frac
+    zero_x = pad_l + neg_w
+    pos_scale = pos_w / (span_pos or 1.0)
+    neg_scale = (neg_w / (span_neg or 1.0)) if span_neg > 0 else 0.0
+
+    for i, (lbl, v) in enumerate(rows):
+        yc = pad_t + i * row_h + row_h / 2
+        out.append(f'<text x="{pad_l-8}" y="{yc+3.2}" text-anchor="end" font-size="9" '
+                   f'fill="#1c2529">{esc(lbl)}</text>')
+        if v >= 0:
+            w = v * pos_scale
+            x = zero_x; color = "#2a6b7c"
+            tx = x + w + 5; anchor = "start"
         else:
-            anchor = "middle"
-
-        out.append(
-            f'<line x1="{lx0:.1f}" y1="{ly0:.1f}" '
-            f'x2="{lx1:.1f}" y2="{ly1:.1f}" '
-            f'stroke="#999" stroke-width="0.8"/>'
-        )
-        out.append(
-            f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="{anchor}" '
-            f'dominant-baseline="middle" font-size="8.5" fill="#333" '
-            f'font-family="Helvetica,Arial,sans-serif">{esc(lbl)}: {esc(pct)}</text>'
-        )
-        cur += sweep
-
+            w = (-v) * neg_scale
+            x = zero_x - w; color = "#b4453b"
+            tx = zero_x + 5; anchor = "start"
+        out.append(f'<rect x="{x:.1f}" y="{yc-bar_h/2:.1f}" width="{max(w,0.6):.1f}" '
+                   f'height="{bar_h:.1f}" rx="1.5" fill="{color}"/>')
+        lblcolor = "#b4453b" if v < 0 else "#4a585d"
+        out.append(f'<text x="{tx:.1f}" y="{yc+3.2:.1f}" text-anchor="{anchor}" font-size="8.5" '
+                   f'fill="{lblcolor}">{fmt(v)}</text>')
+    out.append(f'<line x1="{zero_x:.1f}" y1="{pad_t}" x2="{zero_x:.1f}" y2="{height-pad_b}" '
+               f'stroke="#cfd8db" stroke-width="0.8"/>')
     out.append("</svg>")
     return "".join(out)
 
 
-def stacked_bar_svg(categories, custodians, data, width=520, height=320):
-    """
-    Stacked bar chart: x-axis = asset categories, stacked colours = custodians.
-
-    categories : list of category name strings (x-axis)
-    custodians : list of custodian name strings (stack colours)
-    data       : {custodian: {category: float_value}}
-    """
-    pad_l, pad_r, pad_t, pad_b = 58, 175, 20, 56
-
-    cw = width  - pad_l - pad_r
+def stacked_bar_svg(categories, custodians, data, width=560, height=300):
+    """Stacked vertical bar: x=categories, stacks=custodians, value labels on totals.
+    data: {custodian: {category: value}}"""
+    pad_l, pad_r, pad_t, pad_b = 50, 150, 22, 40
+    cw = width - pad_l - pad_r
     ch = height - pad_t - pad_b
 
-    # Max stacked height per category (positive values only)
-    cat_max = max(
-        (sum(max(0.0, data.get(cust, {}).get(cat, 0.0)) for cust in custodians)
-         for cat in categories),
-        default=1.0
-    )
-    if cat_max <= 0:
-        cat_max = 1.0
+    cat_tot = {c: sum(max(0.0, data.get(s, {}).get(c, 0.0)) for s in custodians) for c in categories}
+    cmax = max(cat_tot.values(), default=1.0) or 1.0
+    mag = 10 ** math.floor(math.log10(cmax))
+    nice = math.ceil(cmax / mag) * mag
+    if nice < cmax * 1.08:
+        nice += mag
+    ticks = 4
+    step = nice / ticks
 
-    # Round y-axis ceiling to a nice number
-    mag = 10 ** math.floor(math.log10(cat_max))
-    nice_max = math.ceil(cat_max / mag) * mag
-    if nice_max < cat_max * 1.1:
-        nice_max += mag
+    out = [f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+           f'xmlns="http://www.w3.org/2000/svg" font-family="Helvetica,Arial,sans-serif">']
+    for i in range(ticks + 1):
+        yv = i * step
+        yp = pad_t + ch - (yv / nice) * ch
+        out.append(f'<line x1="{pad_l}" y1="{yp:.1f}" x2="{pad_l+cw}" y2="{yp:.1f}" stroke="#eef2f3" stroke-width="1"/>')
+        out.append(f'<text x="{pad_l-6}" y="{yp+3:.1f}" text-anchor="end" font-size="8" fill="#7b8a90">{yv/1e6:.0f}</text>')
+    midy = pad_t + ch / 2
+    out.append(f'<text x="{pad_l-38}" y="{midy:.1f}" text-anchor="middle" font-size="8" fill="#7b8a90" '
+               f'transform="rotate(-90,{pad_l-38:.1f},{midy:.1f})">Value in USD (M)</text>')
 
-    n_ticks = 4
-    tick_step = nice_max / n_ticks
-
-    out = [
-        f'<svg width="{width}" height="{height}" '
-        f'viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">',
-        f'<rect width="{width}" height="{height}" fill="white"/>',
-    ]
-
-    # Grid lines + y-axis labels
-    for i in range(n_ticks + 1):
-        y_val = i * tick_step
-        yp = pad_t + ch - (y_val / nice_max) * ch
-        out.append(
-            f'<line x1="{pad_l}" y1="{yp:.1f}" x2="{pad_l + cw}" y2="{yp:.1f}" '
-            f'stroke="#e8e8e8" stroke-width="0.8"/>'
-        )
-        lbl = f"{y_val / 1e6:.0f}" if y_val > 0 else "0"
-        out.append(
-            f'<text x="{pad_l - 5}" y="{yp + 3:.1f}" text-anchor="end" '
-            f'font-size="8" fill="#666" font-family="Helvetica,Arial,sans-serif">{lbl}</text>'
-        )
-
-    # Y-axis label (rotated)
-    mid_y = pad_t + ch / 2
-    out.append(
-        f'<text x="{pad_l - 45}" y="{mid_y:.1f}" text-anchor="middle" '
-        f'font-size="8" fill="#555" font-family="Helvetica,Arial,sans-serif" '
-        f'transform="rotate(-90,{pad_l - 45:.1f},{mid_y:.1f})">Value in USD (M)</text>'
-    )
-
-    # Bars
-    n_cats = len(categories)
-    bar_w = (cw / n_cats) * 0.48
-
-    for j, cat in enumerate(categories):
-        xc = pad_l + (j + 0.5) * (cw / n_cats)
-        xb = xc - bar_w / 2
-        cum_h = 0.0
-        for i, cust in enumerate(custodians):
-            val = max(0.0, data.get(cust, {}).get(cat, 0.0))
-            if val <= 0:
+    n = len(categories)
+    bw = (cw / n) * 0.5
+    for j, c in enumerate(categories):
+        xc = pad_l + (j + 0.5) * (cw / n)
+        xb = xc - bw / 2
+        cum = 0.0
+        for i, s in enumerate(custodians):
+            v = max(0.0, data.get(s, {}).get(c, 0.0))
+            if v <= 0:
                 continue
-            bh = (val / nice_max) * ch
-            yb = pad_t + ch - cum_h - bh
-            color = CHART_COLORS[i % len(CHART_COLORS)]
-            out.append(
-                f'<rect x="{xb:.1f}" y="{yb:.1f}" width="{bar_w:.1f}" '
-                f'height="{bh:.1f}" fill="{color}"/>'
-            )
-            cum_h += bh
+            bh = (v / nice) * ch
+            yb = pad_t + ch - cum - bh
+            out.append(f'<rect x="{xb:.1f}" y="{yb:.1f}" width="{bw:.1f}" height="{bh:.1f}" fill="{CHART_COLORS[i%len(CHART_COLORS)]}"/>')
+            cum += bh
+        if cat_tot[c] > 0:
+            out.append(f'<text x="{xc:.1f}" y="{pad_t+ch-cum-4:.1f}" text-anchor="middle" font-size="7.5" '
+                       f'fill="#4a585d">{cat_tot[c]/1e6:.1f}</text>')
+        out.append(f'<text x="{xc:.1f}" y="{pad_t+ch+15:.1f}" text-anchor="middle" font-size="8.5" fill="#1c2529">{esc(c)}</text>')
 
-        out.append(
-            f'<text x="{xc:.1f}" y="{pad_t + ch + 16:.1f}" text-anchor="middle" '
-            f'font-size="8" fill="#444" font-family="Helvetica,Arial,sans-serif">{esc(cat)}</text>'
-        )
-
-    # Axes
-    out.append(
-        f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t + ch}" '
-        f'stroke="#aaa" stroke-width="0.8"/>'
-    )
-    out.append(
-        f'<line x1="{pad_l}" y1="{pad_t + ch}" x2="{pad_l + cw}" y2="{pad_t + ch}" '
-        f'stroke="#aaa" stroke-width="0.8"/>'
-    )
-
-    # Legend (right side)
-    lx = pad_l + cw + 12
-    for i, cust in enumerate(custodians):
-        ly = pad_t + 16 + i * 18
-        color = CHART_COLORS[i % len(CHART_COLORS)]
-        out.append(f'<rect x="{lx}" y="{ly}" width="11" height="10" fill="{color}"/>')
-        out.append(
-            f'<text x="{lx + 15}" y="{ly + 9}" font-size="8" fill="#444" '
-            f'font-family="Helvetica,Arial,sans-serif">{esc(cust)}</text>'
-        )
-
-    out.append("</svg>")
-    return "".join(out)
-
-
-def simple_bar_svg(categories, values, width=360, height=220):
-    """
-    Simple single-colour bar chart (used for currency distribution).
-    categories : list of strings
-    values     : list of floats (USD amounts)
-    """
-    pad_l, pad_r, pad_t, pad_b = 58, 20, 15, 48
-
-    cw = width  - pad_l - pad_r
-    ch = height - pad_t - pad_b
-
-    max_val = max((v for v in values if v > 0), default=1.0)
-    mag = 10 ** math.floor(math.log10(max_val))
-    nice_max = math.ceil(max_val / mag) * mag
-    if nice_max < max_val * 1.1:
-        nice_max += mag
-
-    n_ticks = 4
-    tick_step = nice_max / n_ticks
-
-    out = [
-        f'<svg width="{width}" height="{height}" '
-        f'viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">',
-        f'<rect width="{width}" height="{height}" fill="white"/>',
-    ]
-
-    for i in range(n_ticks + 1):
-        y_val = i * tick_step
-        yp = pad_t + ch - (y_val / nice_max) * ch
-        out.append(
-            f'<line x1="{pad_l}" y1="{yp:.1f}" x2="{pad_l + cw}" y2="{yp:.1f}" '
-            f'stroke="#e8e8e8" stroke-width="0.8"/>'
-        )
-        lbl = f"{y_val / 1e6:.2f}" if y_val > 0 else "0"
-        out.append(
-            f'<text x="{pad_l - 4}" y="{yp + 3:.1f}" text-anchor="end" '
-            f'font-size="8" fill="#666" font-family="Helvetica,Arial,sans-serif">{lbl}</text>'
-        )
-
-    mid_y = pad_t + ch / 2
-    out.append(
-        f'<text x="{pad_l - 48}" y="{mid_y:.1f}" text-anchor="middle" '
-        f'font-size="8" fill="#555" font-family="Helvetica,Arial,sans-serif" '
-        f'transform="rotate(-90,{pad_l - 48:.1f},{mid_y:.1f})">Value in USD (M)</text>'
-    )
-
-    n_cats = len(categories)
-    bar_w = (cw / n_cats) * 0.5
-
-    for j, (cat, val) in enumerate(zip(categories, values)):
-        xc = pad_l + (j + 0.5) * (cw / n_cats)
-        if val > 0:
-            bh = (val / nice_max) * ch
-            yb = pad_t + ch - bh
-            out.append(
-                f'<rect x="{xc - bar_w / 2:.1f}" y="{yb:.1f}" '
-                f'width="{bar_w:.1f}" height="{bh:.1f}" fill="#2a6b7c"/>'
-            )
-        out.append(
-            f'<text x="{xc:.1f}" y="{pad_t + ch + 16:.1f}" text-anchor="middle" '
-            f'font-size="9" fill="#444" font-family="Helvetica,Arial,sans-serif">{esc(cat)}</text>'
-        )
-
-    out.append(
-        f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t + ch}" '
-        f'stroke="#aaa" stroke-width="0.8"/>'
-    )
-    out.append(
-        f'<line x1="{pad_l}" y1="{pad_t + ch}" x2="{pad_l + cw}" y2="{pad_t + ch}" '
-        f'stroke="#aaa" stroke-width="0.8"/>'
-    )
+    out.append(f'<line x1="{pad_l}" y1="{pad_t+ch}" x2="{pad_l+cw}" y2="{pad_t+ch}" stroke="#cfd8db" stroke-width="0.8"/>')
+    lx = pad_l + cw + 16
+    ly0 = pad_t + (ch - len(custodians) * 17) / 2
+    for i, s in enumerate(custodians):
+        ly = ly0 + i * 17
+        out.append(f'<rect x="{lx}" y="{ly}" width="11" height="11" rx="2" fill="{CHART_COLORS[i%len(CHART_COLORS)]}"/>')
+        out.append(f'<text x="{lx+16}" y="{ly+9.5}" font-size="8.5" fill="#1c2529">{esc(s)}</text>')
     out.append("</svg>")
     return "".join(out)
 
@@ -456,47 +357,172 @@ def load_and_compute(csv_path):
 # HTML GENERATION (template filling)
 # ============================================================
 
+# Max individual holdings rendered per Position Detail section before the
+# remainder is collapsed into a single aggregated "Other holdings" row.
+# Keeps long sections (e.g. 199 options) from overflowing the PDF while
+# preserving a genuinely granular, per-instrument list like the legacy report.
+MAX_POS_ROWS = 18
+
+
+def _desc_for(p):
+    """Best human label for a position: Description, else ISIN, else raw type."""
+    d = p.get("description", "").strip()
+    if d and d.lower() != "na":
+        return d
+    if p.get("isin", "").strip():
+        return p["isin"].strip()
+    return p.get("raw_type", "") or "—"
+
+
 def _pos_rows_html(positions_list, cat):
     """
-    Generate condensed <tr> rows for one Position Detail section.
-    Groups by raw product type, showing count + subtotal per type.
+    Generate granular per-holding <tr> rows for one Position Detail section.
+
+    Columns: Custodian | Account | Description | Ccy | Value in USD | %
+    matching the legacy Wisdom statement layout. Rows are sorted by absolute
+    USD value (largest first). If a section has more than MAX_POS_ROWS holdings,
+    the smaller ones are collapsed into a single aggregated remainder row so the
+    page never overflows. Percentages are share of the category's gross
+    (absolute-value) total, so signed positions read sensibly.
     """
-    rows = positions_list or []
+    rows = [p for p in (positions_list or []) if abs(p["value_usd"]) > 0.01]
     if not rows:
-        return '<tr class="na-row"><td colspan="4">—</td></tr>'
+        return '<tr class="na-row"><td colspan="6">na</td></tr>'
 
-    by_type = defaultdict(list)
-    for p in rows:
-        by_type[p["raw_type"]].append(p)
+    # Denominator: gross (absolute) category total so signed shares are sane.
+    gross_total = sum(abs(p["value_usd"]) for p in rows) or 1.0
 
-    type_totals = {t: sum(p["value_usd"] for p in ps) for t, ps in by_type.items()}
-    cat_total = sum(type_totals.values()) or 1.0
+    ordered = sorted(rows, key=lambda p: -abs(p["value_usd"]))
+
+    shown = ordered[:MAX_POS_ROWS]
+    rest  = ordered[MAX_POS_ROWS:]
 
     html_rows = []
-    for t in sorted(type_totals, key=lambda t: -type_totals[t]):
-        val = type_totals[t]
-        count = len(by_type[t])
-        pct = val / cat_total * 100
+    for p in shown:
+        val = p["value_usd"]
+        pct = abs(val) / gross_total * 100
+        desc = _desc_for(p)
+        if len(desc) > 88:
+            desc = desc[:87].rstrip() + "…"
         html_rows.append(
             f'<tr>'
-            f'<td>{esc(t)}</td>'
-            f'<td class="r">{count}</td>'
+            f'<td>{esc(p["broker"])}</td>'
+            f'<td>{esc(p["portfolio"])}</td>'
+            f'<td class="desc">{esc(desc)}</td>'
+            f'<td>{esc(p["currency"])}</td>'
             f'<td class="r">{fmt(val)}</td>'
             f'<td class="r">{pct:.2f}%</td>'
             f'</tr>'
         )
+
+    if rest:
+        rest_val = sum(p["value_usd"] for p in rest)
+        rest_pct = abs(rest_val) / gross_total * 100
+        html_rows.append(
+            f'<tr class="more-row">'
+            f'<td>—</td><td>—</td>'
+            f'<td class="desc"><em>Other holdings ({len(rest)} positions)</em></td>'
+            f'<td>—</td>'
+            f'<td class="r">{fmt(rest_val)}</td>'
+            f'<td class="r">{rest_pct:.2f}%</td>'
+            f'</tr>'
+        )
+
+    # Section subtotal row (signed sum of all positions in the category)
+    section_total = sum(p["value_usd"] for p in rows)
+    html_rows.append(
+        f'<tr class="subtotal-row">'
+        f'<td colspan="4">Subtotal &mdash; {esc(POS_SECTION_TITLE.get(cat, cat))}</td>'
+        f'<td class="r">{fmt(section_total)}</td>'
+        f'<td class="r">100.00%</td>'
+        f'</tr>'
+    )
     return "\n".join(html_rows)
 
 
-def generate_html(data, template_path, client_name, rm_name):
+def _short_usd(n):
+    """Compact USD label for donut centre, e.g. 128.99M / 1.30B / 540K."""
+    a = abs(n)
+    if a >= 1e9:
+        return f"{n/1e9:.2f}B"
+    if a >= 1e6:
+        return f"{n/1e6:.2f}M"
+    if a >= 1e3:
+        return f"{n/1e3:.0f}K"
+    return f"{n:.0f}"
+
+
+def _delta_pct(diff, prior):
+    """Percentage change anchored to the *magnitude* of the prior value, signed by the
+    direction of the USD change. This keeps signed liabilities (e.g. loans that grow
+    more negative) reading as a decrease, not a spurious positive."""
+    if not prior:
+        return 0.0
+    return diff / abs(prior) * 100
+
+
+def _delta_badge(cur, prior):
+    """Return (html_span, plain_text) describing change vs prior. prior None -> em-dash."""
+    if prior is None:
+        return ('<span class="delta-flat">&mdash;</span>', "\u2014")
+    diff = cur - prior
+    pct = _delta_pct(diff, prior)
+    arrow = "\u25B2" if diff > 0 else ("\u25BC" if diff < 0 else "")
+    cls = "delta-up" if diff > 0 else ("delta-down" if diff < 0 else "delta-flat")
+    sign = "+" if diff > 0 else ("" if diff < 0 else "")
+    txt = f"{arrow} {sign}{fmt(diff)} ({sign}{pct:.1f}%)".strip()
+    return (f'<span class="{cls}">{txt}</span>', txt)
+
+
+def _delta_cell(cur, prior):
+    """Two table cells (Δ USD | Δ%) for a row. prior None -> em-dashes."""
+    if prior is None:
+        return "<td class='num delta-flat'>&mdash;</td><td class='num delta-flat'>&mdash;</td>"
+    diff = cur - prior
+    pct = _delta_pct(diff, prior)
+    cls = "delta-up" if diff > 0 else ("delta-down" if diff < 0 else "delta-flat")
+    sign = "+" if diff > 0 else ("" if diff < 0 else "")
+    return (f"<td class='num {cls}'>{sign}{fmt(diff)}</td>"
+            f"<td class='num {cls}'>{sign}{pct:.1f}%</td>")
+
+
+def _load_logo_data_uri(template_path):
+    """Return the embedded Wisdom logo as a PNG data-URI string.
+    Looks for logo_datauri.txt next to the template (or the engine). The file is the
+    real brand logo extracted from the legacy statement — NEVER a recreation.
+    Falls back to an empty string if missing so rendering still succeeds."""
+    here = os.path.dirname(os.path.abspath(template_path)) or "."
+    candidates = [
+        os.path.join(here, "logo_datauri.txt"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "logo_datauri.txt"),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                return f.read().strip()
+    return ""
+
+
+def generate_html(data, template_path, client_name, rm_name, prior=None):
+    """Fill template with the current snapshot. If `prior` (a load_and_compute dict
+    from an earlier statement) is supplied, period-over-period deltas are rendered;
+    otherwise all delta tokens fall back to em-dashes (fully backward-compatible)."""
     with open(template_path, encoding="utf-8") as f:
         tmpl = f.read()
+
+    logo_data_uri = _load_logo_data_uri(template_path)
 
     d             = data
     stmt_date     = d["stmt_date_display"]
     grand_total   = d["grand_total"]
     custodians    = d["custodians"]
     asset_totals  = d["asset_totals"]
+
+    # Prior snapshot lookups (None-safe)
+    p_grand   = prior["grand_total"]      if prior else None
+    p_asset   = prior["asset_totals"]     if prior else {}
+    p_cust    = prior["custodian_totals"] if prior else {}
+    p_date    = prior["stmt_date_display"] if prior else None
 
     # ── Cover page: custodian/portfolio rows ──────────────────
     cov_rows = []
@@ -523,7 +549,7 @@ def generate_html(data, template_path, client_name, rm_name):
         if val > 0 and grand_total > 0:
             pct_str = f"{val / grand_total * 100:.2f}%"
             asset_pie_segs.append((cat, val, pct_str))
-    asset_pie = pie_svg(asset_pie_segs)
+    asset_pie = donut_svg(asset_pie_segs, center_title="TOTAL", center_value=_short_usd(grand_total))
 
     # ── Custodian Allocation table rows ───────────────────────
     cust_alloc_rows = []
@@ -540,7 +566,7 @@ def generate_html(data, template_path, client_name, rm_name):
         val = d["custodian_totals"][cust]
         if val > 0 and grand_total > 0:
             cust_pie_segs.append((cust, val, f"{val / grand_total * 100:.2f}%"))
-    custodian_pie = pie_svg(cust_pie_segs)
+    custodian_pie = donut_svg(cust_pie_segs, center_title="TOTAL", center_value=_short_usd(grand_total))
 
     # ── Custodian/Asset stacked bar ───────────────────────────
     chart_cats   = [c for c in CATEGORIES if c != "Ins."]
@@ -577,9 +603,9 @@ def generate_html(data, template_path, client_name, rm_name):
     currency_summary_rows = "\n".join(cur_sum_rows)
 
     # ── Currency bar chart (all categories) ───────────────────
-    bar_ccys = [c for c in sorted_ccys if ccy_totals[c] > 0]
-    bar_vals = [ccy_totals[c] for c in bar_ccys]
-    currency_bar = simple_bar_svg(bar_ccys, bar_vals)
+    # Horizontal bars keep the dominant USD bar readable and show signed values.
+    ccy_rows = [(c, ccy_totals[c]) for c in sorted_ccys if abs(ccy_totals[c]) > 0.01]
+    currency_bar = hbar_svg(ccy_rows)
 
     # ── Currency × Asset cross-tab rows ──────────────────────
     cc_rows = []
@@ -610,7 +636,96 @@ def generate_html(data, template_path, client_name, rm_name):
     # ── Total USD display (cover page) ───────────────────────
     total_value_usd = f"USD {fmt(grand_total)}"
 
-    # ── Build full replacement dict ───────────────────────────
+    # ── Period-over-period deltas (optional) ─────────────────
+    # Cover badge: grand-total change vs prior snapshot.
+    cover_delta_html, _cover_delta_txt = _delta_badge(grand_total, p_grand)
+    if prior:
+        change_caption = (f"Change vs {esc(p_date)} \u2014 "
+                          f"prior total USD {fmt(p_grand)}")
+    else:
+        change_caption = "No prior statement supplied \u2014 period-over-period comparison unavailable."
+
+    # Portfolio Change table: grand total + each asset class + each custodian.
+    change_rows = []
+    # Grand total row (emphasised)
+    change_rows.append(
+        f"<tr class='pchange-total'><td>Total Portfolio Value</td>"
+        f"<td class='num'>{fmt(grand_total)}</td>"
+        f"<td class='num'>{fmt(p_grand) if prior else '&mdash;'}</td>"
+        f"{_delta_cell(grand_total, p_grand)}</tr>"
+    )
+    # Asset-class rows
+    for cat in CATEGORIES:
+        cur_v = asset_totals.get(cat, 0.0)
+        pri_v = p_asset.get(cat, 0.0) if prior else None
+        if cur_v == 0 and (pri_v in (0.0, None)):
+            continue
+        change_rows.append(
+            f"<tr><td>Asset \u2014 {esc(cat)}</td>"
+            f"<td class='num'>{fmt(cur_v)}</td>"
+            f"<td class='num'>{fmt(pri_v) if prior else '&mdash;'}</td>"
+            f"{_delta_cell(cur_v, pri_v)}</tr>"
+        )
+    # Custodian rows (union of current + prior custodians)
+    all_custs = sorted(set(d["custodian_totals"]) | set(p_cust.keys()))
+    for cust in all_custs:
+        cur_v = d["custodian_totals"].get(cust, 0.0)
+        pri_v = p_cust.get(cust, 0.0) if prior else None
+        new_tag = ""
+        if prior and cust not in p_cust:
+            new_tag = " <span class='pchange-new'>NEW</span>"
+        change_rows.append(
+            f"<tr><td>Custodian \u2014 {esc(cust)}{new_tag}</td>"
+            f"<td class='num'>{fmt(cur_v)}</td>"
+            f"<td class='num'>{fmt(pri_v) if prior else '&mdash;'}</td>"
+            f"{_delta_cell(cur_v, pri_v)}</tr>"
+        )
+    portfolio_change_rows = "\n".join(change_rows)
+
+    # Conditional Portfolio Change section + section numbering.
+    # When a prior statement IS supplied, Portfolio Change is Section 05,
+    # Position Detail 06, Disclaimer 07. When NO prior is supplied, the
+    # Portfolio Change page is omitted entirely (no orphan em-dash table)
+    # and the remaining sections shift up to 05 / 06.
+    if prior:
+        portfolio_change_section = (
+            "<div class=\"page-break\">\n"
+            "  <div class=\"section-eyebrow\">Section 05</div>\n"
+            "  <h2>Portfolio Change</h2>\n"
+            f"  <div class=\"pchange-caption\">{change_caption}</div>\n"
+            "  <table class=\"pchange\">\n"
+            "    <thead>\n"
+            "      <tr>\n"
+            "        <td>Line item</td>\n"
+            "        <td class=\"r\">Current (USD)</td>\n"
+            "        <td class=\"r\">Prior (USD)</td>\n"
+            "        <td class=\"r\">&Delta; USD</td>\n"
+            "        <td class=\"r\">&Delta; %</td>\n"
+            "      </tr>\n"
+            "    </thead>\n"
+            "    <tbody>\n"
+            f"      {portfolio_change_rows}\n"
+            "    </tbody>\n"
+            "  </table>\n"
+            "</div>"
+        )
+        toc_change_row = (
+            "<tr style=\"border-bottom:1px solid var(--hair);\">\n"
+            "        <td style=\"font-size:10pt; padding:12px 0; color:var(--teal-700); font-weight:600;\">05 &nbsp; Portfolio Change</td>\n"
+            "        <td style=\"text-align:right; font-size:10pt; padding:12px 0; color:var(--muted);\">6</td>\n"
+            "      </tr>\n      "
+        )
+        sec_position_no   = "06"
+        sec_disclaimer_no = "07"
+        toc_position_page = "7"
+    else:
+        portfolio_change_section = ""
+        toc_change_row    = ""
+        sec_position_no   = "05"
+        sec_disclaimer_no = "06"
+        toc_position_page = "6"
+
+    # Build full replacement dict ───────────────────────────
     replacements = {
         "statement_date_display":       stmt_date,
         "client_name":                  esc(client_name),
@@ -628,6 +743,14 @@ def generate_html(data, template_path, client_name, rm_name):
         "currency_summary_rows":        currency_summary_rows,
         "currency_bar_svg":             currency_bar,
         "currency_crosstab_rows":       currency_crosstab_rows,
+        "cover_delta_badge":            cover_delta_html,
+        "portfolio_change_section":     portfolio_change_section,
+        "toc_change_row":               toc_change_row,
+        "sec_position_no":              sec_position_no,
+        "sec_disclaimer_no":            sec_disclaimer_no,
+        "toc_position_page":            toc_position_page,
+        "prior_statement_date":         esc(p_date) if prior else "\u2014",
+        "logo_data_uri":                logo_data_uri,
         **pos_tokens,
     }
 
@@ -650,6 +773,8 @@ def main():
     parser.add_argument("--rm",      default="Relationship Manager",  help="Relationship Manager name")
     parser.add_argument("--output",  default="output",                help="Output directory")
     parser.add_argument("--template",default="template.html",         help="Path to template.html")
+    parser.add_argument("--prior",   default=None,
+                        help="Optional path to a PRIOR period CSV for period-over-period deltas")
     args = parser.parse_args()
 
     base     = os.path.splitext(os.path.basename(args.csv_path))[0]
@@ -670,8 +795,16 @@ def main():
         if val:
             print(f"      {cat:12s}: {fmt(val)}")
 
+    prior_data = None
+    if args.prior:
+        print(f"      Prior snapshot : loading {args.prior} …")
+        prior_data = load_and_compute(args.prior)
+        print(f"      Prior total    : USD {fmt(prior_data['grand_total'])} "
+              f"({prior_data['stmt_date_display']})")
+        print(f"      Net change     : USD {fmt(data['grand_total'] - prior_data['grand_total'])}")
+
     print(f"[2/3] Filling template …")
-    filled_html = generate_html(data, args.template, args.client, args.rm)
+    filled_html = generate_html(data, args.template, args.client, args.rm, prior=prior_data)
 
     with open(out_html, "w", encoding="utf-8") as f:
         f.write(filled_html)
