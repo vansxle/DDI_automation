@@ -178,8 +178,8 @@ FORM_HTML = r"""
         <div class="rtitle"><span class="check">&#10003;</span> Statement generated</div>
         <p class="rmeta">Client <b>{{ client }}</b> &middot; RM <b>{{ rm }}</b>{% if compared %} &middot; <b>period-over-period</b> comparison included{% endif %}</p>
         <div class="actions">
-          {% if pdf_name %}<a class="btn-link btn-pdf" href="/download/pdf/{{ pdf_name }}">Download PDF</a>{% endif %}
           <a class="btn-link btn-html" href="/preview/{{ html_name }}" target="_blank">Preview HTML</a>
+          <a class="btn-link btn-pdf" href="/print/{{ html_name }}" target="_blank">Save as PDF</a>
         </div>
       </div>
       <hr class="divider-h">
@@ -330,6 +330,15 @@ def download_pdf(name):
 def preview_html(name):
     path = os.path.join(UPLOAD_DIR, os.path.basename(name))
     return send_file(path, mimetype="text/html")
+
+
+@app.route("/print/<path:name>")
+def print_html(name):
+    path = os.path.join(UPLOAD_DIR, os.path.basename(name))
+    with open(path, "r", encoding="utf-8") as f:
+        html = f.read()
+    html = html.replace("</body>", "<script>window.onload=function(){window.print();}</script></body>")
+    return html, 200, {"Content-Type": "text/html"}
 
 
 if __name__ == "__main__":
