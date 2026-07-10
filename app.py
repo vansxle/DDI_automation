@@ -205,7 +205,7 @@ FORM_HTML = r"""
 
         <div class="field">
           <label>Relationship Manager</label>
-          <input type="text" name="rm" value="{{ rm or '' }}" placeholder="e.g. Ethan Wang" required>
+          <input type="text" name="rm" value="{{ rm or '' }}" placeholder="Type your name here" required>
         </div>
 
         <button type="submit" class="submit" id="submitbtn">
