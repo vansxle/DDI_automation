@@ -823,5 +823,16 @@ table.pchange tbody tr.pchange-total td {
   <div class="end-statement">&lt; End of Statement &gt;</div>
 </div>
 
+<style>
+  #print-btn {
+    position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+    background: #143b46; color: #fff; border: none; border-radius: 8px;
+    padding: 12px 22px; font-size: 14px; font-weight: 600; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  }
+  #print-btn:hover { background: #2a6b7c; }
+  @media print { #print-btn { display: none; } }
+</style>
+<button id="print-btn" onclick="window.print()">&#128438; Save as PDF</button>
 </body>
 </html>
