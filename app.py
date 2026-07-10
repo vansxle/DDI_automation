@@ -173,12 +173,12 @@ FORM_HTML = r"""
       <div class="error">{{ error }}</div>
       {% endif %}
 
-      {% if pdf_name %}
+      {% if html_name %}
       <div class="result">
         <div class="rtitle"><span class="check">&#10003;</span> Statement generated</div>
         <p class="rmeta">Client <b>{{ client }}</b> &middot; RM <b>{{ rm }}</b>{% if compared %} &middot; <b>period-over-period</b> comparison included{% endif %}</p>
         <div class="actions">
-          <a class="btn-link btn-pdf"  href="/download/pdf/{{ pdf_name }}">Download PDF</a>
+          {% if pdf_name %}<a class="btn-link btn-pdf" href="/download/pdf/{{ pdf_name }}">Download PDF</a>{% endif %}
           <a class="btn-link btn-html" href="/preview/{{ html_name }}" target="_blank">Preview HTML</a>
         </div>
       </div>
