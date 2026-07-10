@@ -291,15 +291,19 @@ def index():
 
         base = os.path.splitext(csv_file.filename)[0]
         html_name = base + "_statement.html"
-        pdf_name  = base + "_statement.pdf"
         html_path = os.path.join(UPLOAD_DIR, html_name)
-        pdf_path  = os.path.join(UPLOAD_DIR, pdf_name)
 
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(html_str)
 
-        from weasyprint import HTML as WP_HTML
-        WP_HTML(string=html_str).write_pdf(pdf_path)
+        pdf_name = None
+        try:
+            from weasyprint import HTML as WP_HTML
+            pdf_name = base + "_statement.pdf"
+            pdf_path = os.path.join(UPLOAD_DIR, pdf_name)
+            WP_HTML(string=html_str).write_pdf(pdf_path)
+        except Exception:
+            pass  # WeasyPrint unavailable; HTML-only mode
 
     except Exception as e:
         return render_template_string(FORM_HTML, logo_white=LOGO_WHITE,
