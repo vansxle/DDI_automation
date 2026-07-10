@@ -25,7 +25,7 @@ from collections import defaultdict
 try:
     from weasyprint import HTML as WPhtml
 except ImportError:
-    sys.exit("WeasyPrint not installed. Run: pip3 install weasyprint --break-system-packages")
+    WPhtml = None
 
 # ============================================================
 # CATEGORY MAPPING
@@ -941,9 +941,12 @@ def main():
         f.write(filled_html)
     print(f"      HTML → {out_html}")
 
-    print(f"[3/3] Rendering PDF …")
-    WPhtml(filename=out_html).write_pdf(out_pdf)
-    print(f"      PDF  → {out_pdf}")
+    if WPhtml:
+        print(f"[3/3] Rendering PDF …")
+        WPhtml(filename=out_html).write_pdf(out_pdf)
+        print(f"      PDF  → {out_pdf}")
+    else:
+        print(f"[3/3] WeasyPrint not available — skipping PDF, HTML saved to {out_html}")
 
     return out_pdf
 
