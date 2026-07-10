@@ -38,7 +38,7 @@ CATEGORY_MAP = {
     "FRN":           "Bond",        # floating-rate notes (asset class = bonds)
     "Equity":        "Equity",      # direct equities
     "ETF":           "Equity",      # exchange-traded funds (equity)
-    "Precious Metal":"Equity",      # bullion / gold accounts
+    "Precious Metal":"Precious Metal", # bullion / gold accounts (separate from equity)
     "FCN":           "STP",         # fixed coupon notes (structured)
     "BEN":           "STP",         # barrier / enhanced notes (structured)
     "CLN":           "STP",         # credit-linked notes (structured)
@@ -49,15 +49,16 @@ CATEGORY_MAP = {
     "TL":            "Loan",        # term loans (typically negative value)
 }
 
-CATEGORIES      = ["Liquidity", "Bond", "Equity", "Fund", "STP", "Loan", "Ins."]
+CATEGORIES      = ["Liquidity", "Bond", "Equity", "Precious Metal", "Fund", "STP", "Loan", "Ins."]
 POS_SECTION_TITLE = {
-    "Liquidity": "Liquidity",
-    "Bond":      "Bond",
-    "Equity":    "Equity",
-    "Fund":      "Fund",
-    "STP":       "Structured Product",
-    "Loan":      "Loan",
-    "Ins.":      "Insurance",
+    "Liquidity":      "Liquidity",
+    "Bond":           "Bond",
+    "Equity":         "Equity",
+    "Precious Metal": "Precious Metal",
+    "Fund":           "Fund",
+    "STP":            "Structured Product",
+    "Loan":           "Loan",
+    "Ins.":           "Insurance",
 }
 
 # Teal palette used for charts (dark → light)
@@ -75,6 +76,24 @@ def fmt(n):
     """Format a number with comma thousands separator, 0 decimals."""
     if n is None:
         return "na"
+    return f"{n:,.0f}"
+
+
+def fmt_price(n):
+    """Format a unit price — 4 decimal places for small values, 2 for large."""
+    if n is None or n == 0:
+        return "—"
+    if abs(n) < 100:
+        return f"{n:,.4f}"
+    return f"{n:,.2f}"
+
+
+def fmt_qty(n):
+    """Format a nominal/quantity — no decimals for whole lots, 4dp for fractional."""
+    if n is None or n == 0:
+        return "—"
+    if abs(n) < 100:
+        return f"{n:,.4f}"
     return f"{n:,.0f}"
 
 
@@ -102,11 +121,12 @@ def _arc(cx, cy, r, a0, a1):
     return x0, y0, x1, y1, large
 
 
-def donut_svg(segments, width=470, height=300, center_title="", center_value=""):
+def donut_svg(segments, width=470, height=300, center_title="", center_value="", total_override=None):
     """Donut chart with a clean side legend (label, value, %).
-    segments: list of (label, value, ...). Only value>0 drawn; % recomputed internally."""
+    segments: list of (label, value, ...). Only value>0 drawn.
+    total_override: if supplied, use this as the % denominator so legend matches the allocation table."""
     pos = [(l, v) for l, v, *_ in segments if v > 0]
-    total = sum(v for _, v in pos) or 1.0
+    total = total_override if total_override else (sum(v for _, v in pos) or 1.0)
 
     R = 92        # outer radius
     r_in = 56     # inner radius (donut hole)
@@ -291,6 +311,10 @@ def load_and_compute(csv_path):
                 "description": row["Description"].strip(),
                 "value_usd":   val,
                 "isin":        row["ISIN"].strip(),
+                "nominal":     safe_float(row.get("Nominal/Quantity", "")),
+                "cost_price":  safe_float(row.get("Cost_Price", "")),
+                "last_price":  safe_float(row.get("Last_Price", "")),
+                "ticker":      row.get("Product_Valor", "").strip(),
             })
 
     # Statement date from FileDate column of first non-blank row
@@ -374,7 +398,7 @@ def _desc_for(p):
     return p.get("raw_type", "") or "—"
 
 
-def _pos_rows_html(positions_list, cat):
+def _pos_rows_html(positions_list, cat, portfolio_pct=None):
     """
     Generate granular per-holding <tr> rows for one Position Detail section.
 
@@ -387,33 +411,83 @@ def _pos_rows_html(positions_list, cat):
     """
     rows = [p for p in (positions_list or []) if abs(p["value_usd"]) > 0.01]
     if not rows:
-        return '<tr class="na-row"><td colspan="6">na</td></tr>'
+        return '<tr class="na-row"><td colspan="9">na</td></tr>'
 
-    # Denominator: gross (absolute) category total so signed shares are sane.
     gross_total = sum(abs(p["value_usd"]) for p in rows) or 1.0
 
-    ordered = sorted(rows, key=lambda p: -abs(p["value_usd"]))
+    # Step 1: pick top rows by value, rest → "Other holdings"
+    by_value  = sorted(rows, key=lambda p: -abs(p["value_usd"]))
+    shown_raw = by_value[:MAX_POS_ROWS]
+    rest      = by_value[MAX_POS_ROWS:]
 
-    shown = ordered[:MAX_POS_ROWS]
-    rest  = ordered[MAX_POS_ROWS:]
+    # Step 2: group shown rows by security (ticker if available, else description)
+    def _sec_key(p):
+        t = p.get("ticker", "").strip()
+        return t.lower() if t else _desc_for(p).lower()
+
+    groups: dict = {}
+    for p in shown_raw:
+        k = _sec_key(p)
+        groups.setdefault(k, []).append(p)
+
+    # Sort groups by combined value descending
+    sorted_keys = sorted(groups, key=lambda k: -sum(abs(p["value_usd"]) for p in groups[k]))
 
     html_rows = []
-    for p in shown:
-        val = p["value_usd"]
-        pct = abs(val) / gross_total * 100
-        desc = _desc_for(p)
-        if len(desc) > 88:
-            desc = desc[:87].rstrip() + "…"
-        html_rows.append(
-            f'<tr>'
-            f'<td>{esc(p["broker"])}</td>'
-            f'<td>{esc(p["portfolio"])}</td>'
-            f'<td class="desc">{esc(desc)}</td>'
-            f'<td>{esc(p["currency"])}</td>'
-            f'<td class="r">{fmt(val)}</td>'
-            f'<td class="r">{pct:.2f}%</td>'
-            f'</tr>'
-        )
+    for k in sorted_keys:
+        grp = sorted(groups[k], key=lambda p: (-abs(p["value_usd"]), p["broker"], p["portfolio"]))
+        multi = len(grp) > 1
+
+        # Group summary header (only when 2+ positions share the same security)
+        if multi:
+            g_nominal  = sum(p.get("nominal", 0) for p in grp)
+            g_val      = sum(p["value_usd"] for p in grp)
+            g_pct      = abs(g_val) / gross_total * 100
+            nom_w      = sum(p.get("nominal", 0) * p.get("cost_price", 0) for p in grp)
+            avg_cost   = nom_w / g_nominal if g_nominal else 0
+            mkt        = max(grp, key=lambda p: abs(p["value_usd"])).get("last_price", 0)
+            ticker     = grp[0].get("ticker", "").strip()
+            desc       = _desc_for(grp[0])
+            if len(desc) > 88:
+                desc = desc[:87].rstrip() + "…"
+            desc_cell  = (f'<strong>{esc(desc)}</strong><br><span class="ticker">{esc(ticker)}</span>'
+                          if ticker else f'<strong>{esc(desc)}</strong>')
+            html_rows.append(
+                f'<tr class="pos-group-hdr">'
+                f'<td colspan="2" class="grp-cust">consolidated</td>'
+                f'<td class="desc">{desc_cell}</td>'
+                f'<td>—</td>'
+                f'<td class="r">{fmt_qty(g_nominal)}</td>'
+                f'<td class="r grp-avg">avg {fmt_price(avg_cost)}</td>'
+                f'<td class="r">{fmt_price(mkt)}</td>'
+                f'<td class="r">{fmt(g_val)}</td>'
+                f'<td class="r">{g_pct:.2f}%</td>'
+                f'</tr>'
+            )
+
+        for p in grp:
+            val  = p["value_usd"]
+            pct  = abs(val) / gross_total * 100
+            desc = _desc_for(p)
+            if len(desc) > 88:
+                desc = desc[:87].rstrip() + "…"
+            ticker    = p.get("ticker", "").strip()
+            desc_cell = (f'{esc(desc)}<br><span class="ticker">{esc(ticker)}</span>'
+                         if (ticker and not multi) else esc(desc))
+            row_cls   = ' class="pos-sub-row"' if multi else ''
+            html_rows.append(
+                f'<tr{row_cls}>'
+                f'<td>{esc(p["broker"])}</td>'
+                f'<td>{esc(p["portfolio"])}</td>'
+                f'<td class="desc">{desc_cell}</td>'
+                f'<td>{esc(p["currency"])}</td>'
+                f'<td class="r">{fmt_qty(p.get("nominal", 0))}</td>'
+                f'<td class="r">{fmt_price(p.get("cost_price", 0))}</td>'
+                f'<td class="r">{fmt_price(p.get("last_price", 0))}</td>'
+                f'<td class="r">{fmt(val)}</td>'
+                f'<td class="r">{pct:.2f}%</td>'
+                f'</tr>'
+            )
 
     if rest:
         rest_val = sum(p["value_usd"] for p in rest)
@@ -422,7 +496,7 @@ def _pos_rows_html(positions_list, cat):
             f'<tr class="more-row">'
             f'<td>—</td><td>—</td>'
             f'<td class="desc"><em>Other holdings ({len(rest)} positions)</em></td>'
-            f'<td>—</td>'
+            f'<td>—</td><td>—</td><td>—</td><td>—</td>'
             f'<td class="r">{fmt(rest_val)}</td>'
             f'<td class="r">{rest_pct:.2f}%</td>'
             f'</tr>'
@@ -430,9 +504,10 @@ def _pos_rows_html(positions_list, cat):
 
     # Section subtotal row (signed sum of all positions in the category)
     section_total = sum(p["value_usd"] for p in rows)
+    pct_badge = (f' <span class="section-pct">{portfolio_pct}</span>' if portfolio_pct else "")
     html_rows.append(
         f'<tr class="subtotal-row">'
-        f'<td colspan="4">Subtotal &mdash; {esc(POS_SECTION_TITLE.get(cat, cat))}</td>'
+        f'<td colspan="7">Subtotal &mdash; {esc(POS_SECTION_TITLE.get(cat, cat))}{pct_badge}</td>'
         f'<td class="r">{fmt(section_total)}</td>'
         f'<td class="r">100.00%</td>'
         f'</tr>'
@@ -537,8 +612,9 @@ def generate_html(data, template_path, client_name, rm_name, prior=None):
     asset_rows = []
     for cat in CATEGORIES:
         val = asset_totals.get(cat, 0.0)
+        pct = val / grand_total * 100 if grand_total else 0.0
         asset_rows.append(
-            f"<tr><td>{esc(cat)}</td><td class='num'>{fmt(val)}</td></tr>"
+            f"<tr><td>{esc(cat)}</td><td class='num'>{fmt(val)}</td><td class='num'>{pct:.1f}%</td></tr>"
         )
     asset_alloc_rows = "\n".join(asset_rows)
 
@@ -549,7 +625,23 @@ def generate_html(data, template_path, client_name, rm_name, prior=None):
         if val > 0 and grand_total > 0:
             pct_str = f"{val / grand_total * 100:.2f}%"
             asset_pie_segs.append((cat, val, pct_str))
-    asset_pie = donut_svg(asset_pie_segs, center_title="TOTAL", center_value=_short_usd(grand_total))
+    asset_pie = donut_svg(asset_pie_segs, center_title="TOTAL", center_value=_short_usd(grand_total), total_override=grand_total)
+
+    # ── Asset % chip summary ──────────────────────────────────
+    chips = []
+    for cat in CATEGORIES:
+        val = asset_totals.get(cat, 0.0)
+        if val == 0:
+            continue
+        pct = val / grand_total * 100 if grand_total else 0.0
+        cls = "chip-neg" if val < 0 else "chip-pos"
+        chips.append(
+            f'<span class="pct-chip {cls}">'
+            f'<span class="pct-chip-lbl">{esc(cat)}</span>'
+            f'<span class="pct-chip-val">{pct:.1f}%</span>'
+            f'</span>'
+        )
+    asset_pct_chips = '<div class="pct-chips">' + "".join(chips) + "</div>"
 
     # ── Custodian Allocation table rows ───────────────────────
     cust_alloc_rows = []
@@ -566,7 +658,7 @@ def generate_html(data, template_path, client_name, rm_name, prior=None):
         val = d["custodian_totals"][cust]
         if val > 0 and grand_total > 0:
             cust_pie_segs.append((cust, val, f"{val / grand_total * 100:.2f}%"))
-    custodian_pie = donut_svg(cust_pie_segs, center_title="TOTAL", center_value=_short_usd(grand_total))
+    custodian_pie = donut_svg(cust_pie_segs, center_title="TOTAL", center_value=_short_usd(grand_total), total_override=grand_total)
 
     # ── Custodian/Asset stacked bar ───────────────────────────
     chart_cats   = [c for c in CATEGORIES if c != "Ins."]
@@ -576,13 +668,27 @@ def generate_html(data, template_path, client_name, rm_name, prior=None):
     ca_rows = []
     for cust in sorted(d["custodian_totals"]):
         total = d["custodian_totals"][cust]
+        pct   = total / grand_total * 100 if grand_total else 0.0
         cells = "".join(
             f"<td>{fmt(d['custodian_asset'].get(cust, {}).get(cat, 0.0))}</td>"
             for cat in CATEGORIES
         )
         ca_rows.append(
-            f"<tr><td>{esc(cust)}</td>{cells}<td class='total'>{fmt(total)}</td></tr>"
+            f"<tr><td>{esc(cust)}</td>{cells}"
+            f"<td class='total'>{fmt(total)}</td><td class='pct'>{pct:.1f}%</td></tr>"
         )
+    tot_cells = "".join(f"<td class='total'>{fmt(asset_totals.get(cat, 0.0))}</td>" for cat in CATEGORIES)
+    ca_rows.append(
+        f"<tr class='xtab-total-row'><td>Total</td>{tot_cells}"
+        f"<td class='total'>{fmt(grand_total)}</td><td class='pct'>100%</td></tr>"
+    )
+    pct_cells = "".join(
+        f"<td class='pct'>{asset_totals.get(cat, 0.0) / grand_total * 100:.1f}%</td>"
+        for cat in CATEGORIES
+    ) if grand_total else "".join(f"<td class='pct'>—</td>" for _ in CATEGORIES)
+    ca_rows.append(
+        f"<tr class='xtab-pct-row'><td>%</td>{pct_cells}<td class='pct'>100%</td><td>—</td></tr>"
+    )
     custodian_asset_crosstab_rows = "\n".join(ca_rows)
 
     # ── Currency totals across all categories (shared by summary + cross-tab) ──
@@ -613,24 +719,43 @@ def generate_html(data, template_path, client_name, rm_name, prior=None):
         total = ccy_totals[ccy]
         if abs(total) < 0.01:
             continue
+        pct = total / grand_total * 100 if grand_total else 0.0
         cells = "".join(
             f"<td>{fmt(d['currency_asset'][ccy].get(cat, 0.0))}</td>"
             for cat in CATEGORIES
         )
         cc_rows.append(
-            f"<tr><td>{esc(ccy)}</td>{cells}<td class='total'>{fmt(total)}</td></tr>"
+            f"<tr><td>{esc(ccy)}</td>{cells}"
+            f"<td class='total'>{fmt(total)}</td><td class='pct'>{pct:.1f}%</td></tr>"
         )
+    tot_cells_cc = "".join(f"<td class='total'>{fmt(asset_totals.get(cat, 0.0))}</td>" for cat in CATEGORIES)
+    cc_rows.append(
+        f"<tr class='xtab-total-row'><td>Total</td>{tot_cells_cc}"
+        f"<td class='total'>{fmt(grand_total)}</td><td class='pct'>100%</td></tr>"
+    )
+    pct_cells_cc = "".join(
+        f"<td class='pct'>{asset_totals.get(cat, 0.0) / grand_total * 100:.1f}%</td>"
+        for cat in CATEGORIES
+    ) if grand_total else "".join(f"<td class='pct'>—</td>" for _ in CATEGORIES)
+    cc_rows.append(
+        f"<tr class='xtab-pct-row'><td>%</td>{pct_cells_cc}<td class='pct'>100%</td><td>—</td></tr>"
+    )
     currency_crosstab_rows = "\n".join(cc_rows)
 
     # ── Position Detail rows (one section per category) ───────
+    def _pct(cat):
+        val = asset_totals.get(cat, 0.0)
+        return f"{val / grand_total * 100:.1f}% of portfolio" if grand_total else None
+
     pos_tokens = {
-        "pos_liquidity_rows": _pos_rows_html(d["positions_by_cat"].get("Liquidity", []), "Liquidity"),
-        "pos_bond_rows":      _pos_rows_html(d["positions_by_cat"].get("Bond", []),      "Bond"),
-        "pos_equity_rows":    _pos_rows_html(d["positions_by_cat"].get("Equity", []),    "Equity"),
-        "pos_fund_rows":      _pos_rows_html(d["positions_by_cat"].get("Fund", []),      "Fund"),
-        "pos_stp_rows":       _pos_rows_html(d["positions_by_cat"].get("STP", []),       "STP"),
-        "pos_loan_rows":      _pos_rows_html(d["positions_by_cat"].get("Loan", []),      "Loan"),
-        "pos_insurance_rows": _pos_rows_html(d["positions_by_cat"].get("Ins.", []),      "Ins."),
+        "pos_liquidity_rows":       _pos_rows_html(d["positions_by_cat"].get("Liquidity",       []), "Liquidity",       _pct("Liquidity")),
+        "pos_bond_rows":            _pos_rows_html(d["positions_by_cat"].get("Bond",             []), "Bond",            _pct("Bond")),
+        "pos_equity_rows":          _pos_rows_html(d["positions_by_cat"].get("Equity",           []), "Equity",          _pct("Equity")),
+        "pos_precious_metal_rows":  _pos_rows_html(d["positions_by_cat"].get("Precious Metal",   []), "Precious Metal",  _pct("Precious Metal")),
+        "pos_fund_rows":            _pos_rows_html(d["positions_by_cat"].get("Fund",             []), "Fund",            _pct("Fund")),
+        "pos_stp_rows":             _pos_rows_html(d["positions_by_cat"].get("STP",              []), "STP",             _pct("STP")),
+        "pos_loan_rows":            _pos_rows_html(d["positions_by_cat"].get("Loan",             []), "Loan",            _pct("Loan")),
+        "pos_insurance_rows":       _pos_rows_html(d["positions_by_cat"].get("Ins.",             []), "Ins.",            _pct("Ins.")),
     }
 
     # ── Total USD display (cover page) ───────────────────────
@@ -733,6 +858,12 @@ def generate_html(data, template_path, client_name, rm_name, prior=None):
         "custodian_accounts_rows":      custodian_accounts_rows,
         "total_value_usd":              total_value_usd,
         "asset_alloc_rows":             asset_alloc_rows,
+        "asset_pct_chips":              asset_pct_chips,
+        **{
+            f"pct_{cat.lower().replace(' ', '_').replace('.', '')}":
+                f"{asset_totals.get(cat, 0.0) / grand_total * 100:.1f}%" if grand_total else "—"
+            for cat in CATEGORIES
+        },
         "asset_grand_total":            fmt(grand_total),
         "asset_pie_svg":                asset_pie,
         "custodian_alloc_rows":         custodian_alloc_rows,

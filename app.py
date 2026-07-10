@@ -167,7 +167,7 @@ FORM_HTML = r"""
   <div class="wrap">
     <div class="card">
       <h1>Consolidated Statement</h1>
-      <p class="sub">Upload a position CSV to generate a client-ready statement. Add a prior snapshot to include a period-over-period comparison.</p>
+      <p class="sub">Upload a position CSV to generate a client-ready consolidated statement.</p>
 
       {% if error %}
       <div class="error">{{ error }}</div>
@@ -196,19 +196,6 @@ FORM_HTML = r"""
             <div class="dz-hint">Current position snapshot &middot; .csv</div>
             <div class="dz-file"></div>
           </div>
-        </div>
-
-        <div class="field">
-          <label>Prior Position CSV <span class="optional-tag">optional</span></label>
-          <div class="dropzone" id="dz-prior">
-            <input type="file" name="prior_file" accept=".csv"
-                   onchange="showFile(this,'dz-prior')">
-            <div class="dz-icon">&#8645;</div>
-            <div class="dz-title">Drop prior snapshot for comparison</div>
-            <div class="dz-hint">Adds a Portfolio Change section &middot; .csv</div>
-            <div class="dz-file"></div>
-          </div>
-          <p class="field-help">When supplied, the statement includes &Delta; USD / &Delta;% per asset class &amp; custodian versus the prior snapshot.</p>
         </div>
 
         <div class="field">

@@ -38,7 +38,7 @@ body {
 
 /* === PAGE SETUP ====================================== */
 @page {
-  size: A4;
+  size: A4 landscape;
   margin: 22mm 15mm 16mm 15mm;
   @bottom-center {
     content: "Wisdom Group Holdings Limited  ·  Consolidated Statement";
@@ -120,8 +120,8 @@ body {
 
 /* === COVER PAGE ====================================== */
 .cover-page {
-  width: 210mm;
-  min-height: 297mm;
+  width: 297mm;
+  min-height: 210mm;
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -130,9 +130,9 @@ body {
   height: 7px;
   background: linear-gradient(90deg, var(--teal-900) 0%, var(--teal-600) 45%, var(--teal-400) 100%);
 }
-.cover-body { flex: 1; padding: 22mm 22mm 12mm 22mm; }
+.cover-body { flex: 1; padding: 10mm 18mm 6mm 18mm; }
 
-.cover-logo-row { display: flex; align-items: center; margin-bottom: 16mm; }
+.cover-logo-row { display: flex; align-items: center; margin-bottom: 7mm; }
 .cover-logo-box {
   width: 58px; height: 58px;
   background: var(--teal-600);
@@ -157,13 +157,13 @@ body {
   color: var(--teal-400); font-weight: 600; margin-bottom: 6px;
 }
 .cover-title {
-  font-size: 23pt; font-weight: 300; color: var(--ink);
-  margin-bottom: 4mm; letter-spacing: .2px;
+  font-size: 19pt; font-weight: 300; color: var(--ink);
+  margin-bottom: 3mm; letter-spacing: .2px;
 }
 .cover-title strong { font-weight: 700; color: var(--teal-700); }
 .cover-rule {
   width: 60px; height: 3px; background: var(--teal-400);
-  margin-bottom: 12mm;
+  margin-bottom: 6mm;
 }
 
 /* Headline portfolio value card */
@@ -171,8 +171,8 @@ body {
   background: linear-gradient(135deg, var(--teal-900) 0%, var(--teal-600) 100%);
   color: #fff;
   border-radius: 8px;
-  padding: 9mm 11mm;
-  margin-bottom: 12mm;
+  padding: 5mm 9mm;
+  margin-bottom: 6mm;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -181,11 +181,11 @@ body {
   font-size: 8pt; text-transform: uppercase; letter-spacing: 1.5px;
   opacity: .85; margin-bottom: 4px;
 }
-.cvc-value { font-size: 22pt; font-weight: 700; letter-spacing: .5px; }
+.cvc-value { font-size: 18pt; font-weight: 700; letter-spacing: .5px; }
 .cvc-asof { text-align: right; font-size: 8.5pt; opacity: .85; line-height: 1.5; }
 .cvc-asof strong { font-weight: 700; }
 
-.cover-grid { display: flex; gap: 14mm; margin-bottom: 12mm; }
+.cover-grid { display: flex; gap: 14mm; margin-bottom: 6mm; }
 .cover-grid-col { flex: 1; }
 .cover-block-title {
   font-size: 7.5pt; text-transform: uppercase; letter-spacing: 1.4px;
@@ -221,7 +221,7 @@ body {
 }
 .cover-footer {
   background: var(--teal-900); color: #fff;
-  padding: 9mm 22mm; display: flex; gap: 30mm;
+  padding: 5mm 18mm; display: flex; gap: 30mm;
 }
 .cover-footer-col { flex: 1; }
 .cover-footer-company { font-size: 9.5pt; font-weight: 700; margin-bottom: 4mm; letter-spacing: .3px; }
@@ -298,6 +298,41 @@ table.xtab tbody td {
 table.xtab tbody tr:nth-child(even) td { background: #fafcfd; }
 table.xtab tbody td:first-child { text-align: left; font-weight: 600; }
 table.xtab tbody td.total { font-weight: 700; color: var(--teal-700); }
+table.xtab tbody td.pct { text-align: right; color: var(--muted); font-size: 8pt; }
+table.xtab tbody tr.xtab-total-row td {
+  font-weight: 700; border-top: 1.5px solid var(--teal-600);
+  background: var(--teal-100) !important; color: var(--teal-900);
+}
+table.xtab tbody tr.xtab-pct-row td {
+  color: var(--muted); font-size: 8pt; background: #fafcfd !important;
+  border-bottom: none;
+}
+.ticker { font-size: 7.5pt; color: var(--teal-600); font-weight: 600; letter-spacing: .3px; }
+
+/* === ALLOCATION % CHIPS ============================= */
+.pct-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px;
+}
+.pct-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 20px;
+  font-size: 8.5pt;
+}
+.pct-chip.chip-pos {
+  background: var(--teal-100); border: 1px solid var(--teal-400);
+}
+.pct-chip.chip-neg {
+  background: #fef2f2; border: 1px solid #fca5a5;
+}
+.pct-chip-lbl { color: var(--muted); font-weight: 500; }
+.pct-chip-val { color: var(--teal-900); font-weight: 700; }
+.pct-chip.chip-neg .pct-chip-val { color: var(--neg); }
+.section-pct {
+  display: inline-block; margin-left: 10px;
+  font-size: 8pt; font-weight: 600; color: #fff;
+  background: var(--teal-600); border-radius: 10px;
+  padding: 2px 9px; vertical-align: middle;
+}
 
 /* === POSITION DETAIL TABLE (granular) =============== */
 table.pos-tbl { border-collapse: collapse; width: 100%; font-size: 8.5pt; }
@@ -314,6 +349,17 @@ table.pos-tbl tbody tr:nth-child(even) td { background: #fafcfd; }
 table.pos-tbl tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
 table.pos-tbl .desc { word-break: break-word; max-width: 300px; line-height: 1.35; }
 table.pos-tbl tbody tr.more-row td { color: var(--muted); background: none !important; }
+table.pos-tbl tbody tr.pos-group-hdr td {
+  background: var(--teal-100) !important;
+  border-top: 1.5px solid var(--teal-400);
+  font-size: 8.5pt;
+}
+table.pos-tbl tbody tr.pos-group-hdr td.grp-cust { color: var(--muted); font-style: italic; }
+table.pos-tbl tbody tr.pos-group-hdr td.grp-avg  { color: var(--teal-700); }
+table.pos-tbl tbody tr.pos-sub-row td {
+  padding-left: 14px; font-size: 8pt; color: #4a585d;
+  background: #fafeff !important;
+}
 table.pos-tbl tbody tr.subtotal-row td {
   font-weight: 700; border-top: 1.5px solid var(--teal-600);
   border-bottom: none; padding-top: 6px; background: var(--teal-100) !important;
@@ -340,7 +386,7 @@ table.pos-tbl tbody tr.subtotal-row td {
 
 /* === REAL WISDOM LOGO ================================ */
 /* Cover: actual extracted brand logo (PNG data URI injected by engine) */
-.cover-logo-img { height: 52px; width: auto; display: block; }
+.cover-logo-img { height: 38px; width: auto; display: block; }
 .cover-logo-cn-stack { font-size: 8pt; color: var(--muted); margin-top: 5px; letter-spacing: 2px; }
 /* Running header: same logo, scaled down but kept legible */
 .rh-logo-img { height: 20px; width: auto; max-width: 120px; display: block; }
@@ -540,11 +586,11 @@ table.pchange tbody tr.pchange-total td {
     <div class="alloc-table-wrap">
       <table class="alloc-tbl">
         <thead>
-          <tr><td>Asset type</td><td class="num">Amount in USD</td></tr>
+          <tr><td>Asset type</td><td class="num">Amount in USD</td><td class="num">%</td></tr>
         </thead>
         <tbody>
           {{asset_alloc_rows}}
-          <tr class="total-row"><td>Total</td><td class="num">{{asset_grand_total}}</td></tr>
+          <tr class="total-row"><td>Total</td><td class="num">{{asset_grand_total}}</td><td class="num">100.0%</td></tr>
         </tbody>
       </table>
     </div>
@@ -552,6 +598,7 @@ table.pchange tbody tr.pchange-total td {
       {{asset_pie_svg}}
     </div>
   </div>
+  {{asset_pct_chips}}
 </div>
 
 
@@ -596,8 +643,8 @@ table.pchange tbody tr.pchange-total td {
     <thead>
       <tr>
         <td>Custodian</td>
-        <td>Liquidity</td><td>Bond</td><td>Equity</td><td>Fund</td>
-        <td>STP</td><td>Loan</td><td>Ins.</td><td>Total</td>
+        <td>Liquidity</td><td>Bond</td><td>Equity</td><td>Prec. Metal</td><td>Fund</td>
+        <td>STP</td><td>Loan</td><td>Ins.</td><td>Total</td><td>%</td>
       </tr>
     </thead>
     <tbody>
@@ -634,8 +681,8 @@ table.pchange tbody tr.pchange-total td {
     <thead>
       <tr>
         <td>Currency</td>
-        <td>Liquidity</td><td>Bond</td><td>Equity</td><td>Fund</td>
-        <td>STP</td><td>Loan</td><td>Ins.</td><td>Total</td>
+        <td>Liquidity</td><td>Bond</td><td>Equity</td><td>Prec. Metal</td><td>Fund</td>
+        <td>STP</td><td>Loan</td><td>Ins.</td><td>Total</td><td>%</td>
       </tr>
     </thead>
     <tbody>
@@ -664,7 +711,7 @@ table.pchange tbody tr.pchange-total td {
     <table class="pos-tbl">
       <thead><tr>
         <td>Custodian</td><td>Account</td><td>Description</td>
-        <td>Ccy</td><td class="r">Value in USD</td><td class="r">%</td>
+        <td>Ccy</td><td class="r">Nominal</td><td class="r">Cost Price</td><td class="r">Mkt Price</td><td class="r">Value in USD</td><td class="r">%</td>
       </tr></thead>
       <tbody>{{pos_liquidity_rows}}</tbody>
     </table>
@@ -675,7 +722,7 @@ table.pchange tbody tr.pchange-total td {
     <table class="pos-tbl">
       <thead><tr>
         <td>Custodian</td><td>Account</td><td>Description</td>
-        <td>Ccy</td><td class="r">Value in USD</td><td class="r">%</td>
+        <td>Ccy</td><td class="r">Nominal</td><td class="r">Cost Price</td><td class="r">Mkt Price</td><td class="r">Value in USD</td><td class="r">%</td>
       </tr></thead>
       <tbody>{{pos_bond_rows}}</tbody>
     </table>
@@ -686,9 +733,20 @@ table.pchange tbody tr.pchange-total td {
     <table class="pos-tbl">
       <thead><tr>
         <td>Custodian</td><td>Account</td><td>Description</td>
-        <td>Ccy</td><td class="r">Value in USD</td><td class="r">%</td>
+        <td>Ccy</td><td class="r">Nominal</td><td class="r">Cost Price</td><td class="r">Mkt Price</td><td class="r">Value in USD</td><td class="r">%</td>
       </tr></thead>
       <tbody>{{pos_equity_rows}}</tbody>
+    </table>
+  </div>
+
+  <div class="pos-section">
+    <h3>Precious Metal</h3>
+    <table class="pos-tbl">
+      <thead><tr>
+        <td>Custodian</td><td>Account</td><td>Description</td>
+        <td>Ccy</td><td class="r">Nominal</td><td class="r">Cost Price</td><td class="r">Mkt Price</td><td class="r">Value in USD</td><td class="r">%</td>
+      </tr></thead>
+      <tbody>{{pos_precious_metal_rows}}</tbody>
     </table>
   </div>
 
@@ -697,7 +755,7 @@ table.pchange tbody tr.pchange-total td {
     <table class="pos-tbl">
       <thead><tr>
         <td>Custodian</td><td>Account</td><td>Description</td>
-        <td>Ccy</td><td class="r">Value in USD</td><td class="r">%</td>
+        <td>Ccy</td><td class="r">Nominal</td><td class="r">Cost Price</td><td class="r">Mkt Price</td><td class="r">Value in USD</td><td class="r">%</td>
       </tr></thead>
       <tbody>{{pos_fund_rows}}</tbody>
     </table>
@@ -708,7 +766,7 @@ table.pchange tbody tr.pchange-total td {
     <table class="pos-tbl">
       <thead><tr>
         <td>Custodian</td><td>Account</td><td>Description</td>
-        <td>Ccy</td><td class="r">Value in USD</td><td class="r">%</td>
+        <td>Ccy</td><td class="r">Nominal</td><td class="r">Cost Price</td><td class="r">Mkt Price</td><td class="r">Value in USD</td><td class="r">%</td>
       </tr></thead>
       <tbody>{{pos_stp_rows}}</tbody>
     </table>
@@ -719,7 +777,7 @@ table.pchange tbody tr.pchange-total td {
     <table class="pos-tbl">
       <thead><tr>
         <td>Custodian</td><td>Account</td><td>Description</td>
-        <td>Ccy</td><td class="r">Value in USD</td><td class="r">%</td>
+        <td>Ccy</td><td class="r">Nominal</td><td class="r">Cost Price</td><td class="r">Mkt Price</td><td class="r">Value in USD</td><td class="r">%</td>
       </tr></thead>
       <tbody>{{pos_loan_rows}}</tbody>
     </table>
@@ -730,7 +788,7 @@ table.pchange tbody tr.pchange-total td {
     <table class="pos-tbl">
       <thead><tr>
         <td>Custodian</td><td>Account</td><td>Description</td>
-        <td>Ccy</td><td class="r">Value in USD</td><td class="r">%</td>
+        <td>Ccy</td><td class="r">Nominal</td><td class="r">Cost Price</td><td class="r">Mkt Price</td><td class="r">Value in USD</td><td class="r">%</td>
       </tr></thead>
       <tbody>{{pos_insurance_rows}}</tbody>
     </table>
